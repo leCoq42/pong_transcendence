@@ -1,11 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   getSocket,
   movePaddle,
   onGameStateUpdate,
   offGameStateUpdate,
-} from '../socket';
-import Scoreboard from './Scoreboard';
+} from "../socket";
+import { joinGame } from "../socket";
+import Scoreboard from "./Scoreboard";
+
+export interface Player {
+  id: string;
+  paddle: Paddle;
+  score: number;
+}
 
 export interface Paddle {
   x: number;
@@ -25,81 +32,149 @@ export interface Ball {
 }
 
 export interface GameState {
-  player1Paddle: Paddle;
-  player2Paddle: Paddle;
+  player1: Player;
+  player2: Player;
   ball: Ball;
-  player1Score: number;
-  player2Score: number;
   gameStarted: Date;
 }
 
 interface GameProps {
   gameMode: string;
   gameId: string;
-  playerId: string;
 }
 
-const Game: React.FC<GameProps> = ({ gameMode, gameId, playerId }) => {
+const Game: React.FC<GameProps> = ({ gameMode, gameId: initialGameId }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const keyRef = useRef<{ [key: string]: boolean }>({});
+  const animationFrameRef = useRef<number>();
+
+  const [gameId, setGameId] = useState<string>(initialGameId);
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const [winner, setWinner] = useState<string | null>(null);
+  const [rematchRequested, setRematchRequested] = useState(false);
+const [gameStarted, setGameStarted] = useState<boolean>(false);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (["ArrowUp", "ArrowDown", "w", "s"].includes(e.key)) {
+      e.preventDefault();
+    }
+    keyRef.current[e.key] = true;
+  }, []);
+
+  const handleKeyUp = useCallback((e: KeyboardEvent) => {
+    keyRef.current[e.key] = false;
+  }, []);
+
+  const processPaddleMovement = useCallback(() => {
+    if (gameMode === "localMultiplayer") {
+      if (keyRef.current["w"]) {
+        movePaddle(gameId, "up", 1);
+      } else if (keyRef.current["s"]) {
+        movePaddle(gameId, "down", 1);
+      }
+      if (keyRef.current["ArrowUp"]) {
+        movePaddle(gameId, "up", 2);
+      } else if (keyRef.current["ArrowDown"]) {
+        movePaddle(gameId, "down", 2);
+      }
+    } else {
+      if (keyRef.current["ArrowUp"]) {
+        movePaddle(gameId, "up");
+      } else if (keyRef.current["ArrowDown"]) {
+        movePaddle(gameId, "down");
+      }
+    }
+
+    animationFrameRef.current = requestAnimationFrame(processPaddleMovement);
+  }, [gameId, gameMode]);
 
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (gameMode === 'localMultiplayer') {
-        if (event.key === 'w') {
-          movePaddle(gameId, 'up');
-        } else if (event.key === 's') {
-          movePaddle(gameId, 'down');
-        } else if (event.key === 'ArrowUp') {
-          movePaddle(gameId, 'up');
-        } else if (event.key === 'ArrowDown') {
-          movePaddle(gameId, 'down');
-        }
-      } else {
-        if (event.key === 'ArrowUp') {
-          movePaddle(gameId, 'up');
-        } else if (event.key === 'ArrowDown') {
-          movePaddle(gameId, 'down');
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    onGameStateUpdate(setGameState);
+    socket.on("gameOver", (data: { winner: string }) => {
+      setWinner(data.winner);
+    });
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      offGameStateUpdate();
+      socket.off("gameOver");
     };
-  }, [gameId, gameMode]);
+  }, []);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    socket.on("rematchStarted", handleRematch);
+
+    return () => {
+      socket.off("rematchStarted", handleRematch);
+    };
+  }, [gameMode]);
+
+  const handleRematch = () => {
+    setGameId("");
+    setGameState(null);
+    setWinner(null);
+    setRematchRequested(false);
+
+    joinGame(gameMode, undefined, (newGameId) => {
+      setGameId(newGameId);
+      setGameStarted(true);
+    });
+  };
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    onGameStateUpdate(setGameState);
+
+    animationFrameRef.current = requestAnimationFrame(processPaddleMovement);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      offGameStateUpdate();
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [gameId, gameMode, handleKeyDown, handleKeyUp, processPaddleMovement]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !gameState) return;
 
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext("2d");
     if (!context) return;
 
-    // Clear the canvas
-    context.fillStyle = '#000';
+    context.fillStyle = "#000";
     context.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw paddles and ball
-    drawPaddle(context, gameState.player1Paddle);
-    drawPaddle(context, gameState.player2Paddle);
-    drawBall(context, gameState.ball);
+    if (gameState.player1 && gameState.player2) {
+      drawPaddle(context, gameState.player1.paddle);
+      drawPaddle(context, gameState.player2.paddle);
+      drawBall(context, gameState.ball);
+    }
   }, [gameState]);
 
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    return () => {};
+  }, [gameId]);
+
   const drawPaddle = (context: CanvasRenderingContext2D, paddle: Paddle) => {
-    context.fillStyle = '#FFF';
+    context.fillStyle = "#FFF";
     context.fillRect(
       paddle.x * (canvasRef.current?.width || 1) * 0.01,
       paddle.y * (canvasRef.current?.height || 1) * 0.01,
       paddle.width * (canvasRef.current?.width || 1) * 0.01,
-      paddle.height * (canvasRef.current?.height || 1) * 0.01,
+      paddle.height * (canvasRef.current?.height || 1) * 0.01
     );
   };
 
@@ -110,27 +185,39 @@ const Game: React.FC<GameProps> = ({ gameMode, gameId, playerId }) => {
       ball.y * (canvasRef.current?.height || 1) * 0.01,
       ball.radius * (canvasRef.current?.width || 1) * 0.01,
       0,
-      Math.PI * 2,
+      Math.PI * 2
     );
-    context.fillStyle = '#FFF';
+    context.fillStyle = "#FFF";
     context.fill();
     context.closePath();
   };
 
-  return (
-    <div>
-      <Scoreboard
-        player1Score={gameState?.player1Score || 0}
-        player2Score={gameState?.player2Score || 0}
-      />
-      <canvas
-        ref={canvasRef}
-        width={800}
-        height={600}
-        style={{ border: '1px solid white' }}
-      />
-    </div>
-  );
+  if (winner) {
+    return (
+      <div className="game-over">
+        <h2>Game Over!</h2>
+        <p>{winner === "player1" ? "Player 1" : "Player 2"} wins!</p>
+        <button onClick={handleRematch} disabled={rematchRequested}>
+          {rematchRequested ? "Rematch Requested" : "Rematch"}
+        </button>
+      </div>
+    );
+  } else {
+    return (
+      <div>
+        <Scoreboard
+          player1Score={gameState?.player1.score || 0}
+          player2Score={gameState?.player2.score || 0}
+        />
+        <canvas
+          ref={canvasRef}
+          width={800}
+          height={600}
+          style={{ border: "1px solid white" }}
+        />
+      </div>
+    );
+  }
 };
 
 export default Game;

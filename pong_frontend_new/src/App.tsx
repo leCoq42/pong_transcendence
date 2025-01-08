@@ -3,13 +3,11 @@ import "./App.css";
 import Lobby from "./components/Lobby";
 import Game from "./components/Game";
 import { connectSocket, disconnectSocket } from "./socket";
-import { v4 as uuidv4 } from "uuid";
 
 const App: React.FC = () => {
   const [gameStarted, setGameStarted] = useState(false);
   const [gameMode, setGameMode] = useState("");
   const [gameId, setGameId] = useState("");
-  const [playerId, setPlayerId] = useState(uuidv4());
 
   useEffect(() => {
     connectSocket();
@@ -31,10 +29,10 @@ const App: React.FC = () => {
   return (
     <div className="app">
       {!gameStarted && (
-        <Lobby onGameStart={handleGameStart} playerId={playerId} />
+        <Lobby onGameStart={handleGameStart} />
       )}
       {gameStarted && (
-        <Game gameMode={gameMode} gameId={gameId} playerId={playerId} />
+        <Game gameMode={gameMode} gameId={gameId} />
       )}
     </div>
   );

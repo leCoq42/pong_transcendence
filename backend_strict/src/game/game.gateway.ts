@@ -3,31 +3,51 @@ import {
   SubscribeMessage,
   MessageBody,
   WebSocketServer,
+  OnGatewayInit,
   OnGatewayConnection,
   OnGatewayDisconnect,
   ConnectedSocket,
 } from '@nestjs/websockets';
+import { Inject, forwardRef, Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { GameService } from './game.service';
 import { MovePaddleDto } from './dto/move-paddle.dto';
+import { JoinGameDto } from './dto/joinGame.dto';
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    credentials: true,
   },
 })
-export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class GameGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
+  private readonly logger = new Logger(GameGateway.name);
   @WebSocketServer()
   server: Server;
 
-  constructor(private readonly gameService: GameService) {}
+  public connectedSockets = new Map<string, Socket>();
+
+  constructor(
+    @Inject(forwardRef(() => GameService))
+    private readonly gameService: GameService,
+  ) {}
+
+  afterInit(server: Server) {
+    this.logger.log(`Server initiated`);
+    this.gameService.setServer(server);
+  }
 
   handleConnection(client: Socket) {
-    console.log(`Client connected: ${client.id}`);
+    this.logger.log(`Client connected: ${client.id}`);
+    this.connectedSockets.set(client.id, client);
   }
 
   handleDisconnect(client: Socket) {
-    console.log(`Client disconnected: ${client.id}`);
+    this.logger.log(`Client disconnected: ${client.id}`);
+    this.connectedSockets.delete(client.id);
     this.gameService.handleDisconnect(client.id);
   }
 
@@ -44,10 +64,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const gameId = this.gameService.createLocalMultiplayerGame(client.id);
       client.join(gameId);
       this.server.to(gameId).emit('gameStarted', gameId);
-    } else if (data.gameMode === 'remoteMultiplayer' && data.gameId) {
-      client.join(data.gameId);
-      this.gameService.addPlayerToGame(data.gameId, client.id);
-      this.server.to(data.gameId).emit('gameStarted', data.gameId);
+    } else if (data.gameMode === 'remoteMultiplayer') {
+      client.emit('queueStatus', { status: 'waiting' });
     }
   }
 
@@ -56,8 +74,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() MovePaddleDto: MovePaddleDto,
   ) {
-    const { gameId, direction } = MovePaddleDto;
-    this.gameService.movePaddle(client.id, gameId, direction);
+    const { gameId, direction, player } = MovePaddleDto;
+    this.gameService.movePaddle(client.id, gameId, direction, player);
   }
 
   @SubscribeMessage('getGameState')
@@ -67,5 +85,13 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const gameState = this.gameService.getGameState(data.gameId);
     client.emit('gameState', gameState);
+  }
+
+  @SubscribeMessage('requestRematch')
+  handleRequestRematch(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { gameId: string },
+  ) {
+    return this.gameService.requestRematch(data.gameId, client.id);
   }
 }

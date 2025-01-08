@@ -19,3 +19,17 @@ body {
   width: 300px;
   margin-bottom: 20px;
 }
+
+.game-over {
+  text-align: center;
+  margin: 2rem;
+}
+
+.game-over h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.game-over p {
+  font-size: 1.5rem;
+}

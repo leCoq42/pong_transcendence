@@ -1,24 +1,72 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { joinQueue, leaveQueue } from "../api";
-import { joinGame } from "../socket";
+import {
+  getSocket,
+  joinGame,
+  onCountdown,
+  offCountdown,
+  onMatchFound,
+  offMatchFound,
+} from "../socket";
 
 interface LobbyProps {
   onGameStart: (gameMode: string, gameId: string) => void;
-  playerId: string;
 }
 
-const Lobby: React.FC<LobbyProps> = ({ onGameStart, playerId }) => {
-  const [queueStatus, setQueueStatus] = useState<string>("idle");
+const Lobby: React.FC<LobbyProps> = ({ onGameStart }) => {
+  const [queueStatus, setQueueStatus] = useState<string | undefined>(undefined);
+  const [playerId, setPlayerId] = useState<string>("");
+  const [countdown, setCountdown] = useState<number | null>(null);
+
+  useEffect(() => {
+    const socket = getSocket();
+
+    const handleCountdown = (data: { gameId: string; duration: number }) => {
+      setCountdown(data.duration);
+      const interval = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev && prev > 1) {
+            return prev - 1;
+          } else {
+            clearInterval(interval);
+            setCountdown(null);
+            return null;
+          }
+        });
+      }, 1000);
+    };
+
+    const handleMatchFound = (data: { gameId: string }) => {
+      onGameStart("remoteMultiplayer", data.gameId);
+    };
+
+    onCountdown(handleCountdown);
+    onMatchFound(handleMatchFound);
+
+    return () => {
+      offCountdown();
+      offMatchFound();
+    };
+  }, [onGameStart]);
 
   const handleJoinQueue = async (gameMode: string) => {
     if (gameMode === "remoteMultiplayer") {
+      const socket = getSocket();
+      if (!socket || !socket.id) return;
+
+      setPlayerId(socket.id);
       setQueueStatus("joining");
-      const response = await joinQueue(playerId);
-      console.log(response);
-      setQueueStatus("inQueue");
+
       joinGame(gameMode, undefined, (gameId) => {
-        onGameStart(gameMode, gameId);
+        setQueueStatus("inQueue");
       });
+
+      const response = await joinQueue(socket.id);
+      console.log(response);
+
+      if (response.message === "Joined queue") {
+        setQueueStatus("inQueue");
+      }
     } else {
       joinGame(gameMode, undefined, (gameId) => {
         onGameStart(gameMode, gameId);
@@ -28,8 +76,10 @@ const Lobby: React.FC<LobbyProps> = ({ onGameStart, playerId }) => {
 
   const handleLeaveQueue = async () => {
     setQueueStatus("leaving");
-    const response = await leaveQueue(playerId);
-    console.log(response);
+    if (playerId) {
+      const response = await leaveQueue(playerId);
+      console.log(response);
+    }
     setQueueStatus("idle");
   };
 
@@ -44,7 +94,7 @@ const Lobby: React.FC<LobbyProps> = ({ onGameStart, playerId }) => {
       </button>
       <button
         onClick={() => handleJoinQueue("remoteMultiplayer")}
-        disabled={queueStatus !== "idle"}
+        disabled={queueStatus !== undefined && queueStatus !== "idle"}
       >
         Remote Multiplayer
       </button>
@@ -53,7 +103,8 @@ const Lobby: React.FC<LobbyProps> = ({ onGameStart, playerId }) => {
           Leave Queue
         </button>
       )}
-      <p>Queue Status: {queueStatus}</p>
+      {queueStatus && <p>Queue Status: {queueStatus}</p>}
+      {countdown !== null && <p>Game starts in: {countdown}</p>}
     </div>
   );
 };

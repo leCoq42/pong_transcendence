@@ -12,6 +12,11 @@ export class QueueService {
   ) {}
 
   addPlayerToQueue(playerId: string) {
+    const socket = this.gameGateway.connectedSockets.get(playerId);
+    if (!socket) {
+      return { message: 'Error: Invalid socket ID', playerId };
+    }
+
     if (!this.queue.includes(playerId)) {
       this.queue.push(playerId);
       this.tryMatchPlayers();
@@ -34,11 +39,25 @@ export class QueueService {
         return;
       }
 
-      const gameId = this.gameService.createLocalMultiplayerGame(player1);
+      const gameId = this.gameService.createRemoteMultiplayerGame(
+        player1,
+        player2,
+      );
       this.gameService.addPlayerToGame(gameId, player2);
 
-      this.gameGateway.server.to(player1).emit('matchFound', { gameId });
-      this.gameGateway.server.to(player2).emit('matchFound', { gameId });
+      const socket1 = this.gameGateway.connectedSockets.get(player1);
+      const socket2 = this.gameGateway.connectedSockets.get(player2);
+
+      if (socket1) socket1.join(gameId);
+      if (socket2) socket2.join(gameId);
+
+      this.gameGateway.server
+        .to([player1, player2])
+        .emit('countdown', { gameId, duration: 3 });
+
+      setTimeout(() => {
+        this.gameGateway.server.to(gameId).emit('matchFound', { gameId });
+      }, 3000);
     }
   }
 }

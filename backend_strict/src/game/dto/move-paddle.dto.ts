@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsString, IsIn } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsIn,
+  IsOptional,
+  IsNumber,
+} from 'class-validator';
 
 export class MovePaddleDto {
   @IsNotEmpty()
@@ -9,4 +15,8 @@ export class MovePaddleDto {
   @IsString()
   @IsIn(['up', 'down'])
   direction: 'up' | 'down';
+
+  @IsOptional()
+  @IsNumber()
+  player?: number;
 }

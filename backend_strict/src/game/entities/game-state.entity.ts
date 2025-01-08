@@ -21,9 +21,15 @@ export interface Paddle {
   speed: number;
 }
 
+export type GameMode =
+  | 'singleplayer'
+  | 'localMultiplayer'
+  | 'remoteMultiplayer';
+
 export interface GameState {
   player1: Player;
   player2: Player;
   ball: Ball;
   gameStarted: Date;
+  gameMode: GameMode;
 }
