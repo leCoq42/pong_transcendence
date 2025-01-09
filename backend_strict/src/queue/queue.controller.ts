@@ -1,4 +1,11 @@
-import { Controller, Post, Delete, Param, Body } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Delete,
+  Param,
+  Body,
+  BadRequestException,
+} from '@nestjs/common';
 import { QueueService } from './queue.service';
 
 @Controller('queue')
@@ -7,7 +14,11 @@ export class QueueController {
 
   @Post('join')
   joinQueue(@Body() body: { playerId: string }) {
-    return this.queueService.addPlayerToQueue(body.playerId);
+    const result = this.queueService.addPlayerToQueue(body.playerId);
+    if (!result || result.message?.startsWith('Error:')) {
+      throw new BadRequestException(result?.message || 'Invalid socket ID');
+    }
+    return result;
   }
 
   @Delete('leave/:playerId')

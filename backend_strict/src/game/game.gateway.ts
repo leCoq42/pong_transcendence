@@ -13,6 +13,7 @@ import { Server, Socket } from 'socket.io';
 import { GameService } from './game.service';
 import { MovePaddleDto } from './dto/move-paddle.dto';
 import { JoinGameDto } from './dto/joinGame.dto';
+import { QueueService } from 'src/queue/queue.service';
 
 @WebSocketGateway({
   cors: {
@@ -33,11 +34,14 @@ export class GameGateway
   constructor(
     @Inject(forwardRef(() => GameService))
     private readonly gameService: GameService,
+    @Inject(forwardRef(() => QueueService))
+    private readonly queueService: QueueService,
   ) {}
 
   afterInit(server: Server) {
     this.logger.log(`Server initiated`);
     this.gameService.setServer(server);
+    this.queueService.setGateway(this);
   }
 
   handleConnection(client: Socket) {
@@ -49,6 +53,7 @@ export class GameGateway
     this.logger.log(`Client disconnected: ${client.id}`);
     this.connectedSockets.delete(client.id);
     this.gameService.handleDisconnect(client.id);
+    this.queueService.removePlayerFromQueue(client.id);
   }
 
   @SubscribeMessage('joinGame')

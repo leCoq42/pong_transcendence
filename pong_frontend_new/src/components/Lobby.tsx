@@ -52,19 +52,17 @@ const Lobby: React.FC<LobbyProps> = ({ onGameStart }) => {
   const handleJoinQueue = async (gameMode: string) => {
     if (gameMode === "remoteMultiplayer") {
       const socket = getSocket();
-      if (!socket || !socket.id) return;
+      if (!socket || !socket.id) {
+        console.log("socket error");
+        return;
+      }
 
       setPlayerId(socket.id);
       setQueueStatus("joining");
 
-      joinGame(gameMode, undefined, (gameId) => {
-        setQueueStatus("inQueue");
-      });
-
       const response = await joinQueue(socket.id);
-      console.log(response);
-
       if (response.message === "Joined queue") {
+        console.log(response);
         setQueueStatus("inQueue");
       }
     } else {

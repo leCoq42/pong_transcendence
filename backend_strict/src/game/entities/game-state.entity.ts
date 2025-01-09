@@ -11,6 +11,7 @@ export interface Player {
   id: string;
   paddle: Paddle;
   score: number;
+  inGame: boolean;
 }
 
 export interface Paddle {

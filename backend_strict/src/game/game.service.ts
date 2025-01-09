@@ -46,11 +46,13 @@ export class GameService {
         id: '',
         paddle: { ...initialPaddle, x: 2 },
         score: 0,
+        inGame: true,
       },
       player2: {
         id: '',
         paddle: { ...initialPaddle, x: 96 },
         score: 0,
+        inGame: true,
       },
       ball: initialBall,
       gameStarted: new Date(),
@@ -86,8 +88,8 @@ export class GameService {
     gameState.player1.id = player1Id;
     gameState.player2.id = player2Id;
     this.games.set(gameId, gameState);
-    this.playerGameMap.set(player1Id, gameId);
-    this.playerGameMap.set(player2Id, gameId);
+    // this.playerGameMap.set(player1Id, gameId);
+    // this.playerGameMap.set(player2Id, gameId);
     this.startGameLoop(gameId);
     return gameId;
   }

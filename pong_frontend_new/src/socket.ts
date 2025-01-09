@@ -28,7 +28,9 @@ export const getSocket = (): Socket => {
   return socket;
 };
 
-export const onCountdown = (callback: (data: { gameId: string; duration: number }) => void) => {
+export const onCountdown = (
+  callback: (data: { gameId: string; duration: number }) => void
+) => {
   socket?.on("countdown", callback);
 };
 
@@ -52,7 +54,7 @@ export const joinGame = (
   socket?.emit("joinGame", { gameMode, gameId });
   if (gameMode === "remoteMultiplayer") {
     socket?.on("matchFound", (data) => {
-      socket?.off("queueStatus"); 
+      socket?.off("queueStatus");
       callback(data.gameId);
     });
     socket?.on("queueStatus", (data) => {
@@ -85,14 +87,14 @@ export const offGameStateUpdate = () => {
 export const requestRematch = (gameId: string) => {
   const socket = getSocket();
   if (socket) {
-    socket.emit('requestRematch', {gameId})
+    socket.emit("requestRematch", { gameId });
   }
-}
+};
 
 export const onRematchStarted = (callback: (gameId: string) => void) => {
-  socket?.on('rematchStarted', callback);
+  socket?.on("rematchStarted", callback);
 };
 
 export const offRematchStarted = () => {
-  socket?.off('rematchStarted');
+  socket?.off("rematchStarted");
 };

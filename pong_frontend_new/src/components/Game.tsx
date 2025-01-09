@@ -19,7 +19,7 @@ export interface Paddle {
   y: number;
   width: number;
   height: number;
-  speed: number;
+  // speed: number;
 }
 
 export interface Ball {
@@ -28,7 +28,7 @@ export interface Ball {
   radius: number;
   velocityX: number;
   velocityY: number;
-  speed: number;
+  // speed: number;
 }
 
 export interface GameState {
