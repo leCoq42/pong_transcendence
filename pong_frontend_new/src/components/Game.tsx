@@ -4,6 +4,7 @@ import {
   movePaddle,
   onGameStateUpdate,
   offGameStateUpdate,
+  requestRematch,
 } from "../socket";
 import { joinGame } from "../socket";
 import Scoreboard from "./Scoreboard";
@@ -41,18 +42,31 @@ export interface GameState {
 interface GameProps {
   gameMode: string;
   gameId: string;
+  queueStatus: string;
+  setQueueStatus: React.Dispatch<React.SetStateAction<string>>;
+  onGameStart: (gameMode: string, gameId: string) => void;
 }
 
-const Game: React.FC<GameProps> = ({ gameMode, gameId: initialGameId }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const keyRef = useRef<{ [key: string]: boolean }>({});
-  const animationFrameRef = useRef<number>();
-
+const Game: React.FC<GameProps> = ({
+  gameMode,
+  gameId: initialGameId,
+  queueStatus,
+  setQueueStatus,
+  onGameStart,
+}) => {
   const [gameId, setGameId] = useState<string>(initialGameId);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [winner, setWinner] = useState<string | null>(null);
   const [rematchRequested, setRematchRequested] = useState(false);
-const [gameStarted, setGameStarted] = useState<boolean>(false);
+  const [gameStarted, setGameStarted] = useState<boolean>(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const keyRef = useRef<{ [key: string]: boolean }>({});
+  const animationFrameRef = useRef<number>();
+  const gameIdRef = useRef(gameId);
+
+  useEffect(() => {
+    gameIdRef.current = gameId;
+  }, [gameId]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (["ArrowUp", "ArrowDown", "w", "s"].includes(e.key)) {
@@ -101,28 +115,46 @@ const [gameStarted, setGameStarted] = useState<boolean>(false);
     };
   }, []);
 
+  const handleRematchClick = () => {
+    setRematchRequested(true);
+    requestRematch(gameId);
+  };
+
+  const handleServerRematch = useCallback(
+    (rematchGameId: string) => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+
+      setGameState(null);
+      setGameId(rematchGameId);
+      setWinner(null);
+      setRematchRequested(false);
+      setQueueStatus("inactive");
+
+      setGameStarted(false);
+      setTimeout(() => setGameStarted(true), 0);
+
+      if (gameMode === "remoteMultiplayer") {
+        joinGame(gameMode, rematchGameId, setQueueStatus, (newGameId) => {
+          onGameStart(gameMode, newGameId);
+        });
+      }
+    },
+    [gameMode, onGameStart, setQueueStatus]
+  );
+
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
 
-    socket.on("rematchStarted", handleRematch);
+    socket.on("rematchStarted", handleServerRematch);
+    console.log("rematch start received");
 
     return () => {
-      socket.off("rematchStarted", handleRematch);
+      socket.off("rematchStarted", handleServerRematch);
     };
-  }, [gameMode]);
-
-  const handleRematch = () => {
-    setGameId("");
-    setGameState(null);
-    setWinner(null);
-    setRematchRequested(false);
-
-    joinGame(gameMode, undefined, (newGameId) => {
-      setGameId(newGameId);
-      setGameStarted(true);
-    });
-  };
+  }, [handleServerRematch]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -138,11 +170,20 @@ const [gameStarted, setGameStarted] = useState<boolean>(false);
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
       offGameStateUpdate();
+
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [gameId, gameMode, handleKeyDown, handleKeyUp, processPaddleMovement]);
+  }, [
+    gameId,
+    gameMode,
+    gameStarted,
+    gameState,
+    handleKeyDown,
+    handleKeyUp,
+    processPaddleMovement,
+  ]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -197,7 +238,7 @@ const [gameStarted, setGameStarted] = useState<boolean>(false);
       <div className="game-over">
         <h2>Game Over!</h2>
         <p>{winner === "player1" ? "Player 1" : "Player 2"} wins!</p>
-        <button onClick={handleRematch} disabled={rematchRequested}>
+        <button onClick={handleRematchClick} disabled={rematchRequested}>
           {rematchRequested ? "Rematch Requested" : "Rematch"}
         </button>
       </div>

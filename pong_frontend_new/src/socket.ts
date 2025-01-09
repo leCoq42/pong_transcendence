@@ -46,9 +46,18 @@ export const offMatchFound = () => {
   socket?.off("matchFound");
 };
 
+export const onQueueStatus = (callback: (data: { status: string }) => void) => {
+  socket?.on("queueStatus", callback);
+};
+
+export const offQueueStatus = () => {
+  socket?.off("queueStatus");
+};
+
 export const joinGame = (
   gameMode: string,
   gameId: string | undefined,
+  setQueueStatus: React.Dispatch<React.SetStateAction<string>>,
   callback: (gameId: string) => void
 ) => {
   socket?.emit("joinGame", { gameMode, gameId });
@@ -58,12 +67,14 @@ export const joinGame = (
       callback(data.gameId);
     });
     socket?.on("queueStatus", (data) => {
+      setQueueStatus(data.status);
       console.log("Queue status:", data.status);
     });
   } else {
     socket?.on("gameStarted", callback);
   }
 };
+
 
 export const movePaddle = (
   gameId: string,

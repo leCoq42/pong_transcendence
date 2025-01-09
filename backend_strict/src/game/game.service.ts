@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   GameState,
   Paddle,
@@ -9,19 +9,19 @@ import { v4 as uuid } from 'uuid';
 import { Server } from 'socket.io';
 
 const SERVER_TICKRATE = 1000 / 60;
-const SCORE_LIMIT = 3;
+const SCORE_LIMIT = 2;
 
 @Injectable()
 export class GameService {
   private server: Server | null = null;
   private rematchRequests: Map<string, string[]> = new Map();
+  private games: Map<string, GameState> = new Map();
+  private playerGameMap: Map<string, string> = new Map();
+  private readonly logger = new Logger(GameService.name);
 
   setServer(server: Server) {
     this.server = server;
   }
-
-  private games: Map<string, GameState> = new Map();
-  private playerGameMap: Map<string, string> = new Map();
 
   private initializeGameState(gameMode: GameMode): GameState {
     const initialPaddle: Paddle = {
@@ -88,8 +88,6 @@ export class GameService {
     gameState.player1.id = player1Id;
     gameState.player2.id = player2Id;
     this.games.set(gameId, gameState);
-    // this.playerGameMap.set(player1Id, gameId);
-    // this.playerGameMap.set(player2Id, gameId);
     this.startGameLoop(gameId);
     return gameId;
   }
@@ -260,13 +258,31 @@ export class GameService {
   }
 
   private startRematch(gameId: string) {
-    const gameState = this.initializeGameState(
-      this.games.get(gameId)!.gameMode,
-    );
-    this.games.set(gameId, gameState);
+    const existingGame = this.games.get(gameId);
+    if (!existingGame) {
+      this.logger.error(`Game ID ${gameId} not found for rematch.`);
+      return;
+    }
+
+    const newGameId = uuid();
+    const gameMode = existingGame.gameMode;
+    const gameState = this.initializeGameState(gameMode);
+
+    if (gameMode === 'singleplayer') {
+      gameState.player1.id = existingGame.player1.id;
+      this.playerGameMap.set(existingGame.player1.id, newGameId);
+    } else {
+      gameState.player1.id = existingGame.player1.id;
+      gameState.player2.id = existingGame.player2.id;
+      this.playerGameMap.set(existingGame.player1.id, newGameId);
+      this.playerGameMap.set(existingGame.player2.id, newGameId);
+    }
+
+    this.games.set(newGameId, gameState);
     this.rematchRequests.delete(gameId);
-    this.startGameLoop(gameId);
-    this.server?.to(gameId).emit('rematchStarted', gameId);
+
+    this.startGameLoop(newGameId);
+    this.server?.to(gameId).emit('rematchStarted', newGameId);
   }
 
   private resetBall(ball: Ball) {

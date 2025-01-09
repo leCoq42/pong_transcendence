@@ -8,6 +8,7 @@ const App: React.FC = () => {
   const [gameStarted, setGameStarted] = useState(false);
   const [gameMode, setGameMode] = useState("");
   const [gameId, setGameId] = useState("");
+  const [queueStatus, setQueueStatus] = useState("inactive");
 
   useEffect(() => {
     connectSocket();
@@ -29,10 +30,20 @@ const App: React.FC = () => {
   return (
     <div className="app">
       {!gameStarted && (
-        <Lobby onGameStart={handleGameStart} />
+        <Lobby
+          onGameStart={handleGameStart}
+          queueStatus={queueStatus}
+          setQueueStatus={setQueueStatus}
+        />
       )}
       {gameStarted && (
-        <Game gameMode={gameMode} gameId={gameId} />
+        <Game
+          gameMode={gameMode}
+          gameId={gameId}
+          queueStatus={queueStatus}
+          setQueueStatus={setQueueStatus}
+          onGameStart={handleGameStart}
+        />
       )}
     </div>
   );

@@ -14,6 +14,7 @@ import { GameService } from './game.service';
 import { MovePaddleDto } from './dto/move-paddle.dto';
 import { JoinGameDto } from './dto/joinGame.dto';
 import { QueueService } from 'src/queue/queue.service';
+import { generate } from 'rxjs';
 
 @WebSocketGateway({
   cors: {
@@ -97,6 +98,14 @@ export class GameGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { gameId: string },
   ) {
-    return this.gameService.requestRematch(data.gameId, client.id);
+    console.log('rematch requested');
+    const result = this.gameService.requestRematch(data.gameId, client.id);
+    if (result && result.gameId) {
+      const newGameId = result.gameId;
+      this.server.in(data.gameId).socketsJoin(newGameId);
+      this.server.to(newGameId).emit('rematchStarted', newGameId);
+    } else {
+      this.logger.error(`Rematch failed for gameId: ${data.gameId}`);
+    }
   }
 }
