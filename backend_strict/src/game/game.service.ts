@@ -56,6 +56,7 @@ export class GameService {
       },
       ball: initialBall,
       gameStarted: new Date(),
+      roundStartTime: Date.now(),
       gameMode,
     };
   }
@@ -160,7 +161,49 @@ export class GameService {
   }
 
   private updateGame(gameId: string, game: GameState) {
+    const now = Date.now();
     const isSinglePlayer = !game.player2.id;
+    const roundStartTime = game.roundStartTime || now;
+
+    if (!game.powerUp && now - roundStartTime >= 2000) {
+      game.powerUp = {
+        x: 20 + Math.random() * 60,
+        y: Math.random() * 100,
+        radius: 3,
+        spawnTime: now,
+      };
+      game.lastPowerUpSpawn = now;
+    }
+
+    if (game.powerUp && now - game.powerUp.spawnTime >= 5000) {
+      game.powerUp = undefined;
+    }
+
+    if (game.powerUp) {
+      const dx = game.ball.x - game.powerUp.x;
+      const dy = game.ball.y - game.powerUp.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < game.ball.radius + game.powerUp.radius) {
+        const affectedPlayer =
+          game.ball.velocityX > 0 ? game.player1 : game.player2;
+        const originalHeight = 10;
+
+        if (affectedPlayer.paddle.height === originalHeight) {
+          affectedPlayer.paddle.height = originalHeight * 2;
+          setTimeout(() => {
+            if (this.games.has(gameId)) {
+              const currentGame = this.games.get(gameId);
+              if (currentGame) {
+                affectedPlayer.paddle.height = originalHeight;
+              }
+            }
+          }, 5000);
+        }
+        game.powerUp = undefined;
+        game.lastPowerUpSpawn = now;
+      }
+    }
 
     if (isSinglePlayer) {
       this.moveBotPaddle(game.player2.paddle, game.ball);
@@ -181,10 +224,10 @@ export class GameService {
 
     if (game.ball.x - game.ball.radius < 0) {
       game.player2.score++;
-      this.resetBall(game.ball);
+      game.roundStartTime = this.resetBall(game.ball, game);
     } else if (game.ball.x + game.ball.radius > 100) {
       game.player1.score++;
-      this.resetBall(game.ball);
+      game.roundStartTime = this.resetBall(game.ball, game);
     }
     this.server?.to(gameId).emit('gameState', game);
   }
@@ -285,12 +328,17 @@ export class GameService {
     this.server?.to(gameId).emit('rematchStarted', newGameId);
   }
 
-  private resetBall(ball: Ball) {
+  private resetBall(ball: Ball, game: GameState) {
     ball.x = 50;
     ball.y = 50;
     ball.velocityX = 0.5 * (ball.velocityX > 0 ? -1 : 1);
     ball.velocityY = 0.5 * (ball.velocityY > 0 ? -1 : 1);
     ball.speed = 1;
+
+    game.powerUp = undefined;
+    game.lastPowerUpSpawn = undefined;
+
+    return Date.now();
   }
 
   private getPlayerIndex(playerId: string, gameId: string): number {

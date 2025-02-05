@@ -22,6 +22,13 @@ export interface Paddle {
   speed: number;
 }
 
+export interface PowerUp {
+  x: number;
+  y: number;
+  radius: number;
+  spawnTime: number;
+}
+
 export type GameMode =
   | 'singleplayer'
   | 'localMultiplayer'
@@ -33,4 +40,7 @@ export interface GameState {
   ball: Ball;
   gameStarted: Date;
   gameMode: GameMode;
+  powerUp?: PowerUp;
+  lastPowerUpSpawn?: number;
+  roundStartTime?: number;
 }

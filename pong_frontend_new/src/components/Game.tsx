@@ -192,13 +192,30 @@ const Game: React.FC<GameProps> = ({
     const context = canvas.getContext("2d");
     if (!context) return;
 
+    const width = canvas.width;
+    const height = canvas.height;
+
     context.fillStyle = "#000";
-    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillRect(0, 0, width, height);
 
     if (gameState.player1 && gameState.player2) {
       drawPaddle(context, gameState.player1.paddle);
       drawPaddle(context, gameState.player2.paddle);
       drawBall(context, gameState.ball);
+    }
+
+    if (gameState.powerUp) {
+      context.beginPath();
+      context.arc(
+        gameState.powerUp.x * width * 0.01,
+        gameState.powerUp.y * height * 0.01,
+        gameState.powerUp.radius * width * 0.01,
+        0,
+        Math.PI * 2
+      );
+      context.fillStyle = "#0F0";
+      context.fill();
+      context.closePath();
     }
   }, [gameState]);
 
