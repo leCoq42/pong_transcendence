@@ -94,20 +94,27 @@ const Game: React.FC<GameProps> = ({
 
   const processPaddleMovement = useCallback(() => {
     if (gameMode === "localMultiplayer") {
-      if (keyRef.current["w"]) {
+      const p1Up = keyRef.current["w"];
+      const p1Down = keyRef.current["s"];
+      if (p1Up && !p1Down) {
         movePaddle(gameId, "up", 1);
-      } else if (keyRef.current["s"]) {
+      } else if (p1Down && !p1Up) {
         movePaddle(gameId, "down", 1);
       }
-      if (keyRef.current["ArrowUp"]) {
+
+      const p2Up = keyRef.current["ArrowUp"];
+      const p2Down = keyRef.current["ArrowDown"];
+      if (p2Up && !p2Down) {
         movePaddle(gameId, "up", 2);
-      } else if (keyRef.current["ArrowDown"]) {
+      } else if (p2Down && !p1Up) {
         movePaddle(gameId, "down", 2);
       }
     } else {
-      if (keyRef.current["ArrowUp"]) {
+      const up = keyRef.current["ArrowUp"];
+      const down = keyRef.current["ArrowDown"];
+      if (up && !down) {
         movePaddle(gameId, "up");
-      } else if (keyRef.current["ArrowDown"]) {
+      } else if (down && !up) {
         movePaddle(gameId, "down");
       }
     }
