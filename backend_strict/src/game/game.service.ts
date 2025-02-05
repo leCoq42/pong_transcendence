@@ -38,7 +38,7 @@ export class GameService {
       radius: 2,
       velocityX: 0.5,
       velocityY: 0.5,
-      speed: 1,
+      speed: 0.75,
     };
 
     return {
@@ -169,7 +169,7 @@ export class GameService {
       game.powerUp = {
         x: 20 + Math.random() * 60,
         y: Math.random() * 100,
-        radius: 3,
+        width: 3,
         spawnTime: now,
       };
       game.lastPowerUpSpawn = now;
@@ -180,11 +180,22 @@ export class GameService {
     }
 
     if (game.powerUp) {
-      const dx = game.ball.x - game.powerUp.x;
-      const dy = game.ball.y - game.powerUp.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const ballLeft = game.ball.x - game.ball.radius;
+      const ballRight = game.ball.x + game.ball.radius;
+      const ballTop = game.ball.y - game.ball.radius;
+      const ballBottom = game.ball.y + game.ball.radius;
 
-      if (distance < game.ball.radius + game.powerUp.radius) {
+      const powerUpLeft = game.powerUp.x;
+      const powerUpRight = game.powerUp.x + game.powerUp.width;
+      const powerUpTop = game.powerUp.y;
+      const powerUpBottom = game.powerUp.y + game.powerUp.width;
+
+      if (
+        ballRight > powerUpLeft &&
+        ballLeft < powerUpRight &&
+        ballBottom > powerUpTop &&
+        ballTop < powerUpBottom
+      ) {
         const affectedPlayer =
           game.ball.velocityX > 0 ? game.player1 : game.player2;
         const originalHeight = 10;
@@ -267,7 +278,8 @@ export class GameService {
       const direction = ball.x < 50 ? 1 : -1;
       ball.velocityX = direction * ball.speed * Math.cos(angleRad);
       ball.velocityY = ball.speed * Math.sin(angleRad);
-      ball.speed += 0.1;
+      ball.speed += 0.05;
+      ball.speed = Math.min(ball.speed, 2.0);
     }
   }
 
@@ -283,20 +295,18 @@ export class GameService {
 
     const requests = this.rematchRequests.get(gameId)!;
     if (!requests.includes(playerId)) {
-      requests?.push(playerId);
+      requests.push(playerId);
     }
 
     const gameMode = game.gameMode;
 
     if (
-      (gameMode === 'singleplayer' || gameMode === 'localMultiplayer') &&
-      requests?.length >= 1
+      ((gameMode === 'singleplayer' || gameMode === 'localMultiplayer') &&
+        requests.length >= 1) ||
+      (gameMode === 'remoteMultiplayer' && requests.length >= 2)
     ) {
-      this.startRematch(gameId);
-    } else if (gameMode === 'remoteMultiplayer' && requests?.length >= 2) {
-      this.startRematch(gameId);
+      return this.startRematch(gameId);
     }
-
     return { message: 'Rematch requested', gameId };
   }
 
@@ -307,25 +317,29 @@ export class GameService {
       return;
     }
 
+    this.games.delete(gameId);
+
     const newGameId = uuid();
     const gameMode = existingGame.gameMode;
     const gameState = this.initializeGameState(gameMode);
 
     if (gameMode === 'singleplayer') {
       gameState.player1.id = existingGame.player1.id;
+      this.playerGameMap.delete(existingGame.player1.id);
       this.playerGameMap.set(existingGame.player1.id, newGameId);
     } else {
       gameState.player1.id = existingGame.player1.id;
       gameState.player2.id = existingGame.player2.id;
+      this.playerGameMap.delete(existingGame.player1.id);
+      this.playerGameMap.delete(existingGame.player2.id);
       this.playerGameMap.set(existingGame.player1.id, newGameId);
       this.playerGameMap.set(existingGame.player2.id, newGameId);
     }
 
     this.games.set(newGameId, gameState);
-    this.rematchRequests.delete(gameId);
-
     this.startGameLoop(newGameId);
-    this.server?.to(gameId).emit('rematchStarted', newGameId);
+    this.rematchRequests.delete(gameId);
+    return { gameId: newGameId, gameMode };
   }
 
   private resetBall(ball: Ball, game: GameState) {
@@ -333,7 +347,7 @@ export class GameService {
     ball.y = 50;
     ball.velocityX = 0.5 * (ball.velocityX > 0 ? -1 : 1);
     ball.velocityY = 0.5 * (ball.velocityY > 0 ? -1 : 1);
-    ball.speed = 1;
+    ball.speed = 0.75;
 
     game.powerUp = undefined;
     game.lastPowerUpSpawn = undefined;

@@ -25,7 +25,7 @@ export interface Paddle {
 export interface PowerUp {
   x: number;
   y: number;
-  radius: number;
+  width: number;
   spawnTime: number;
 }
 

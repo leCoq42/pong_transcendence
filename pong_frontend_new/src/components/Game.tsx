@@ -32,15 +32,28 @@ export interface Ball {
   // speed: number;
 }
 
+export interface PowerUp {
+  x: number;
+  y: number;
+  width: number;
+}
+
+export type GameMode =
+  | "singleplayer"
+  | "localMultiplayer"
+  | "remoteMultiplayer";
+
 export interface GameState {
   player1: Player;
   player2: Player;
   ball: Ball;
   gameStarted: Date;
+  gameMode: GameMode;
+  powerUp?: PowerUp;
 }
 
 interface GameProps {
-  gameMode: string;
+  gameMode: GameMode;
   gameId: string;
   queueStatus: string;
   setQueueStatus: React.Dispatch<React.SetStateAction<string>>;
@@ -132,16 +145,18 @@ const Game: React.FC<GameProps> = ({
       setRematchRequested(false);
       setQueueStatus("inactive");
 
-      setGameStarted(false);
-      setTimeout(() => setGameStarted(true), 0);
-
-      if (gameMode === "remoteMultiplayer") {
-        joinGame(gameMode, rematchGameId, setQueueStatus, (newGameId) => {
-          onGameStart(gameMode, newGameId);
+      const socket = getSocket();
+      if (socket) {
+        socket.once("gameStarted", () => {
+          // Start listening for game state updates before starting paddle movement
+          onGameStateUpdate(setGameState);
+          animationFrameRef.current = requestAnimationFrame(
+            processPaddleMovement
+          );
         });
       }
     },
-    [gameMode, onGameStart, setQueueStatus]
+    [gameMode, processPaddleMovement]
   );
 
   useEffect(() => {
@@ -160,6 +175,10 @@ const Game: React.FC<GameProps> = ({
     const socket = getSocket();
     if (!socket) return;
 
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
     onGameStateUpdate(setGameState);
@@ -173,24 +192,60 @@ const Game: React.FC<GameProps> = ({
 
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = undefined;
       }
     };
-  }, [
-    gameId,
-    gameMode,
-    gameStarted,
-    gameState,
-    handleKeyDown,
-    handleKeyUp,
-    processPaddleMovement,
-  ]);
+  }, [gameId, gameMode, handleKeyDown, handleKeyUp, processPaddleMovement]);
+
+  const drawPaddle = useCallback(
+    (
+      context: CanvasRenderingContext2D,
+      paddle: Paddle,
+      canvasWidth: number,
+      canvasHeight: number
+    ) => {
+      context.fillStyle = "#FFF";
+      context.fillRect(
+        paddle.x * canvasWidth * 0.01,
+        paddle.y * canvasHeight * 0.01,
+        paddle.width * canvasWidth * 0.01,
+        paddle.height * canvasHeight * 0.01
+      );
+    },
+    []
+  );
+
+  const drawBall = useCallback(
+    (
+      context: CanvasRenderingContext2D,
+      ball: Ball,
+      canvasWidth: number,
+      canvasHeight: number
+    ) => {
+      context.beginPath();
+      context.arc(
+        ball.x * canvasWidth * 0.01,
+        ball.y * canvasHeight * 0.01,
+        ball.radius * canvasWidth * 0.01,
+        0,
+        Math.PI * 2
+      );
+      context.fillStyle = "#FFF";
+      context.fill();
+      context.closePath();
+    },
+    []
+  );
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !gameState) return;
 
     const context = canvas.getContext("2d");
-    if (!context) return;
+    if (!context) {
+      console.error("Couldn't get canvas context");
+      return;
+    }
 
     const width = canvas.width;
     const height = canvas.height;
@@ -199,56 +254,22 @@ const Game: React.FC<GameProps> = ({
     context.fillRect(0, 0, width, height);
 
     if (gameState.player1 && gameState.player2) {
-      drawPaddle(context, gameState.player1.paddle);
-      drawPaddle(context, gameState.player2.paddle);
-      drawBall(context, gameState.ball);
+      drawPaddle(context, gameState.player1.paddle, width, height);
+      drawPaddle(context, gameState.player2.paddle, width, height);
+      drawBall(context, gameState.ball, width, height);
     }
 
     if (gameState.powerUp) {
-      context.beginPath();
-      context.arc(
+      const powerUpSize = gameState.powerUp.width * width * 0.01;
+      context.fillStyle = "#0F0";
+      context.fillRect(
         gameState.powerUp.x * width * 0.01,
         gameState.powerUp.y * height * 0.01,
-        gameState.powerUp.radius * width * 0.01,
-        0,
-        Math.PI * 2
+        powerUpSize,
+        powerUpSize
       );
-      context.fillStyle = "#0F0";
-      context.fill();
-      context.closePath();
     }
-  }, [gameState]);
-
-  useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
-
-    return () => {};
-  }, [gameId]);
-
-  const drawPaddle = (context: CanvasRenderingContext2D, paddle: Paddle) => {
-    context.fillStyle = "#FFF";
-    context.fillRect(
-      paddle.x * (canvasRef.current?.width || 1) * 0.01,
-      paddle.y * (canvasRef.current?.height || 1) * 0.01,
-      paddle.width * (canvasRef.current?.width || 1) * 0.01,
-      paddle.height * (canvasRef.current?.height || 1) * 0.01
-    );
-  };
-
-  const drawBall = (context: CanvasRenderingContext2D, ball: Ball) => {
-    context.beginPath();
-    context.arc(
-      ball.x * (canvasRef.current?.width || 1) * 0.01,
-      ball.y * (canvasRef.current?.height || 1) * 0.01,
-      ball.radius * (canvasRef.current?.width || 1) * 0.01,
-      0,
-      Math.PI * 2
-    );
-    context.fillStyle = "#FFF";
-    context.fill();
-    context.closePath();
-  };
+  }, [gameState, drawPaddle, drawBall]);
 
   if (winner) {
     return (
