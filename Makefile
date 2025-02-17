@@ -1,6 +1,6 @@
 NAME = ft_transcendence
 
-DB_DATA = ${HOME}/data/postgres #?
+DB_DATA = ${HOME}/.sgoinfre/transcendence/postgres #?
 
 DOCKER_COMPOSE = docker-compose -f ./docker-compose.yml
 
@@ -8,11 +8,15 @@ DOCKER = docker
 
 all: up
 
-test: down build up
-
-up: build
+up:
 	@mkdir -p $(DB_DATA)
-	${DOCKER_COMPOSE} up -d
+	NODE_ENV=production ${DOCKER_COMPOSE} up --build -d
+
+dev:
+	@mkdir -p $(DB_DATA)
+	NODE_ENV=development ${DOCKER_COMPOSE} --profile dev up --build -d
+
+test: down build up
 
 down:
 	${DOCKER_COMPOSE} down
@@ -26,12 +30,8 @@ stop:
 build:
 	$(DOCKER_COMPOSE) build
 
-nginx:
-	docker exec -it nginx_transcendence bash
-
 postgres:
 	docker exec -it postgres_transcendence bash
-
 
 clean:
 	@docker stop $$(docker ps -qa) || true
@@ -43,7 +43,9 @@ clean:
 
 re: clean up
 
+redev: clean dev
+
 prune: clean
 	@docker system prune -a --volumes -f
 
-.PHONY: all up down start stop build clean re prune nginx postgres
+.PHONY: all up down start stop build clean re prune postgres dev redev

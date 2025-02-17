@@ -7,7 +7,7 @@ services:
       - .env
     container_name: database
     volumes:
-      - ./pgdata:/var/lib/postgresql/data
+      - ~/.sgoinfre/transcendence/pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
 
@@ -16,6 +16,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: ${NODE_ENV:-production}
     ports:
       - "5173:5173"
     depends_on:
@@ -27,16 +28,18 @@ services:
         - action: sync
           path: ./frontend/src
           target: ./frontend/src
-
   backend:
     container_name: backend
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: ${NODE_ENV:-production}
     ports:
       - "3000:3000"
     depends_on:
       - db
+    env_file:
+      - .env
     volumes:
       - ./backend/src:/app/backend/src
     develop:
@@ -55,3 +58,4 @@ services:
       - .env
     ports:
       - "5050:80"
+    profiles: ["dev"]

@@ -6,7 +6,7 @@ import {
   offGameStateUpdate,
   requestRematch,
 } from "../socket";
-import { joinGame } from "../socket";
+// import { joinGame } from "../socket";
 import Scoreboard from "./Scoreboard";
 
 export interface Player {
@@ -71,7 +71,7 @@ const Game: React.FC<GameProps> = ({
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [winner, setWinner] = useState<string | null>(null);
   const [rematchRequested, setRematchRequested] = useState(false);
-  const [gameStarted, setGameStarted] = useState<boolean>(false);
+  // const [gameStarted, setGameStarted] = useState<boolean>(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const keyRef = useRef<{ [key: string]: boolean }>({});
   const animationFrameRef = useRef<number>();
