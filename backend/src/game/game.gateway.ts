@@ -99,7 +99,7 @@ export class GameGateway
   ) {
     console.log('rematch requested');
     const result = this.gameService.requestRematch(data.gameId, client.id);
-    if (result && result.gameId) {
+    if (result && 'gameMode' in result) {
       client.leave(data.gameId);
       client.join(result.gameId);
 
