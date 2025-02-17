@@ -52,8 +52,8 @@ export class GameGateway
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
     this.connectedSockets.delete(client.id);
-    this.gameService.handleDisconnect(client.id);
     this.queueService.removePlayerFromQueue(client.id);
+    this.gameService.handleDisconnect(client.id);
   }
 
   @SubscribeMessage('joinGame')
