@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
 import Lobby from "./components/Lobby";
-import Game from "./components/Game";
+import Game, { GameMode } from "./components/Game";
 import { connectSocket, disconnectSocket } from "./socket";
 
 const App: React.FC = () => {
   const [gameStarted, setGameStarted] = useState(false);
-  const [gameMode, setGameMode] = useState("");
+  const [gameMode, setGameMode] = useState<GameMode>("singleplayer");
   const [gameId, setGameId] = useState("");
   const [queueStatus, setQueueStatus] = useState("inactive");
 
   useEffect(() => {
+    console.log("Connecting socket...");
     connectSocket();
 
     return () => {
@@ -19,7 +20,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleGameStart = (
-    selectedGameMode: string,
+    selectedGameMode: GameMode,
     selectedGameId: string
   ) => {
     setGameMode(selectedGameMode);

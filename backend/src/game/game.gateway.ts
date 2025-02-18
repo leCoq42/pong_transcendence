@@ -17,9 +17,15 @@ import { QueueService } from 'src/queue/queue.service';
 
 @WebSocketGateway({
   cors: {
-    origin: 'http://localhost:5173',
-    methods: ['GET', 'POST'],
+    origin: [
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      'http://0.0.0.0:5173',
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    transports: ['websocket', 'polling'],
   },
 })
 export class GameGateway
@@ -99,23 +105,28 @@ export class GameGateway
   ) {
     console.log('rematch requested');
     const result = this.gameService.requestRematch(data.gameId, client.id);
-    if (result && 'gameMode' in result) {
-      client.leave(data.gameId);
-      client.join(result.gameId);
 
-      if (
-        result.gameMode === 'singleplayer' ||
-        result.gameMode === 'localMultiplayer'
-      ) {
-        client.emit('rematchStarted', result.gameId);
-        client.emit('gameStarted', result.gameId);
-      } else {
-        this.server.to(result.gameId).emit('rematchStarted', result.gameId);
-        this.server.to(result.gameId).emit('gameStarted', result.gameId);
-      }
-    } else {
+    if (!result) {
       this.logger.error(`Rematch failed for gameId: ${data.gameId}`);
-      client.emit('queueStatus', { status: 'waitingForRematch' });
+      client.emit('error', { message: 'Failed to start rematch' });
+      return;
+    }
+
+    if ('message' in result) {
+      this.logger.error(`Rematch failed: ${result.message}`);
+      client.emit('error', { message: result.message });
+      return;
+    }
+
+    client.leave(data.gameId);
+    client.join(result.gameId);
+
+    if (
+      result.gameMode === 'singleplayer' ||
+      result.gameMode === 'localMultiplayer'
+    ) {
+      client.emit('rematchStarted', result.gameId);
+      client.emit('gameStarted', result.gameId);
     }
   }
 }

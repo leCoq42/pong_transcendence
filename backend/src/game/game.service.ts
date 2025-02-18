@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/sequelize';
+import { Match } from './entities/match.entity';
 import {
   GameState,
   Paddle,
@@ -13,6 +15,11 @@ const SCORE_LIMIT = 2;
 
 @Injectable()
 export class GameService {
+  constructor(
+    @InjectModel(Match)
+    private matchModel: typeof Match,
+  ) {}
+
   private server: Server | null = null;
   private rematchRequests: Map<string, string[]> = new Map();
   private games: Map<string, GameState> = new Map();
@@ -21,6 +28,38 @@ export class GameService {
 
   setServer(server: Server) {
     this.server = server;
+  }
+
+  private async saveMatchResult(gameState: GameState) {
+    if (gameState.gameMode === 'remoteMultiplayer') {
+      const winner =
+        gameState.player1.score > gameState.player2.score
+          ? gameState.player1.id
+          : gameState.player2.id;
+
+      await this.matchModel.create({
+        player1Id: gameState.player1.id,
+        player2Id: gameState.player2.id,
+        player1Score: gameState.player1.score,
+        player2Score: gameState.player2.score,
+        gameMode: gameState.gameMode,
+        startTime: gameState.gameStarted,
+        endTime: new Date(),
+        winnerId: winner,
+      });
+    }
+  }
+
+  private handleGameEnd(gameId: string) {
+    const gameState = this.games.get(gameId);
+    if (gameState) {
+      this.saveMatchResult(gameState);
+      // Keep the player IDs in playerGameMap until rematch is handled
+      if (gameState.gameMode === 'remoteMultiplayer') {
+        this.playerGameMap.delete(gameState.player1.id);
+        this.playerGameMap.delete(gameState.player2.id);
+      }
+    }
   }
 
   private initializeGameState(gameMode: GameMode): GameState {
@@ -155,7 +194,18 @@ export class GameService {
           game.player1.score >= SCORE_LIMIT ? 'player1' : 'player2';
         this.server?.to(gameId).emit('gameOver', { winner });
         clearInterval(intervalId);
-        this.games.delete(gameId);
+        setTimeout(() => {
+          const gameExists = this.games.get(gameId);
+          if (gameExists && !this.rematchRequests.has(gameId)) {
+            this.games.delete(gameId);
+            if (game.gameMode === 'singleplayer') {
+              this.playerGameMap.delete(game.player1.id);
+            } else if (game.gameMode === 'localMultiplayer') {
+              this.playerGameMap.delete(game.player1.id);
+              this.playerGameMap.delete(game.player2.id);
+            }
+          }
+        }, 10000);
       }
     }, SERVER_TICKRATE);
   }
@@ -289,6 +339,13 @@ export class GameService {
       return { message: 'Game not found', gameId };
     }
 
+    if (game.gameMode === 'remoteMultiplayer') {
+      return {
+        message: 'Rematch not available in Remote Multiplayer mode',
+        gameId,
+      };
+    }
+
     if (!this.rematchRequests.has(gameId)) {
       this.rematchRequests.set(gameId, []);
     }
@@ -301,9 +358,8 @@ export class GameService {
     const gameMode = game.gameMode;
 
     if (
-      ((gameMode === 'singleplayer' || gameMode === 'localMultiplayer') &&
-        requests.length >= 1) ||
-      (gameMode === 'remoteMultiplayer' && requests.length >= 2)
+      (gameMode === 'singleplayer' || gameMode === 'localMultiplayer') &&
+      requests.length >= 1
     ) {
       return this.startRematch(gameId);
     }
@@ -314,7 +370,7 @@ export class GameService {
     const existingGame = this.games.get(gameId);
     if (!existingGame) {
       this.logger.error(`Game ID ${gameId} not found for rematch.`);
-      return;
+      return { message: 'Game not found', gameId };
     }
 
     this.games.delete(gameId);

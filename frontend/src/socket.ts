@@ -1,13 +1,28 @@
 import { io, Socket } from "socket.io-client";
 import { GameState } from "./components/Game";
 
-const SOCKET_URL = "http://localhost:3000";
-
 let socket: Socket | null = null;
+const VITE_API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 export const connectSocket = () => {
   if (!socket) {
-    socket = io(SOCKET_URL);
+    socket = io(VITE_API_URL, {
+      withCredentials: true,
+      transports: ["websocket", "polling"],
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 20000,
+    });
+
+    socket.on("connect", () => {
+      console.log("Socket connected:", socket?.id);
+    });
+
+    socket.on("connect_error", (error) => {
+      console.error("Socket connection error:", error);
+    });
   }
   return socket;
 };
@@ -15,15 +30,14 @@ export const connectSocket = () => {
 export const disconnectSocket = () => {
   if (socket) {
     socket.disconnect();
+    console.log("Socket disconnected");
     socket = null;
   }
 };
 
 export const getSocket = (): Socket => {
   if (!socket) {
-    socket = io("http://localhost:3000", {
-      withCredentials: true,
-    });
+    socket = connectSocket();
   }
   return socket;
 };
@@ -75,7 +89,6 @@ export const joinGame = (
   }
 };
 
-
 export const movePaddle = (
   gameId: string,
   direction: "up" | "down",
@@ -95,10 +108,17 @@ export const offGameStateUpdate = () => {
   socket?.off("gameState");
 };
 
-export const requestRematch = (gameId: string) => {
+export const requestRematch = (gameId: string, onError?: (message: string) => void) => {
   const socket = getSocket();
   if (socket) {
     socket.emit("requestRematch", { gameId });
+    
+    // Listen for error events
+    socket.once("error", (data: { message: string }) => {
+      if (onError) {
+        onError(data.message);
+      }
+    });
   }
 };
 

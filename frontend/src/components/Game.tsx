@@ -6,7 +6,6 @@ import {
   offGameStateUpdate,
   requestRematch,
 } from "../socket";
-// import { joinGame } from "../socket";
 import Scoreboard from "./Scoreboard";
 
 export interface Player {
@@ -20,7 +19,6 @@ export interface Paddle {
   y: number;
   width: number;
   height: number;
-  // speed: number;
 }
 
 export interface Ball {
@@ -29,7 +27,6 @@ export interface Ball {
   radius: number;
   velocityX: number;
   velocityY: number;
-  // speed: number;
 }
 
 export interface PowerUp {
@@ -55,23 +52,20 @@ export interface GameState {
 interface GameProps {
   gameMode: GameMode;
   gameId: string;
-  queueStatus: string;
   setQueueStatus: React.Dispatch<React.SetStateAction<string>>;
-  onGameStart: (gameMode: string, gameId: string) => void;
 }
 
 const Game: React.FC<GameProps> = ({
   gameMode,
   gameId: initialGameId,
-  queueStatus,
   setQueueStatus,
-  onGameStart,
 }) => {
   const [gameId, setGameId] = useState<string>(initialGameId);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [winner, setWinner] = useState<string | null>(null);
   const [rematchRequested, setRematchRequested] = useState(false);
-  // const [gameStarted, setGameStarted] = useState<boolean>(false);
+  const [rematchError, setRematchError] = useState<string | null>(null);
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const keyRef = useRef<{ [key: string]: boolean }>({});
   const animationFrameRef = useRef<number>();
@@ -106,7 +100,7 @@ const Game: React.FC<GameProps> = ({
       const p2Down = keyRef.current["ArrowDown"];
       if (p2Up && !p2Down) {
         movePaddle(gameId, "up", 2);
-      } else if (p2Down && !p1Up) {
+      } else if (p2Down && !p2Up) {
         movePaddle(gameId, "down", 2);
       }
     } else {
@@ -137,11 +131,16 @@ const Game: React.FC<GameProps> = ({
 
   const handleRematchClick = () => {
     setRematchRequested(true);
-    requestRematch(gameId);
+    setRematchError(null);
+    requestRematch(gameId, (errorMessage) => {
+      setRematchRequested(false);
+      setRematchError(errorMessage);
+    });
   };
 
   const handleServerRematch = useCallback(
     (rematchGameId: string) => {
+      console.log("rematch request received");
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
@@ -155,15 +154,12 @@ const Game: React.FC<GameProps> = ({
       const socket = getSocket();
       if (socket) {
         socket.once("gameStarted", () => {
-          // Start listening for game state updates before starting paddle movement
           onGameStateUpdate(setGameState);
-          animationFrameRef.current = requestAnimationFrame(
-            processPaddleMovement
-          );
+          animationFrameRef.current = requestAnimationFrame(processPaddleMovement);
         });
       }
     },
-    [gameMode, processPaddleMovement]
+    [gameMode, processPaddleMovement, setQueueStatus]
   );
 
   useEffect(() => {
@@ -171,8 +167,6 @@ const Game: React.FC<GameProps> = ({
     if (!socket) return;
 
     socket.on("rematchStarted", handleServerRematch);
-    console.log("rematch start received");
-
     return () => {
       socket.off("rematchStarted", handleServerRematch);
     };
@@ -283,27 +277,32 @@ const Game: React.FC<GameProps> = ({
       <div className="game-over">
         <h2>Game Over!</h2>
         <p>{winner === "player1" ? "Player 1" : "Player 2"} wins!</p>
-        <button onClick={handleRematchClick} disabled={rematchRequested}>
-          {rematchRequested ? "Rematch Requested" : "Rematch"}
-        </button>
-      </div>
-    );
-  } else {
-    return (
-      <div>
-        <Scoreboard
-          player1Score={gameState?.player1.score || 0}
-          player2Score={gameState?.player2.score || 0}
-        />
-        <canvas
-          ref={canvasRef}
-          width={800}
-          height={600}
-          style={{ border: "1px solid white" }}
-        />
+        {gameMode !== "remoteMultiplayer" && (
+          <>
+            <button onClick={handleRematchClick} disabled={rematchRequested}>
+              {rematchRequested ? "Rematch Requested" : "Rematch"}
+            </button>
+            {rematchError && <p className="error-message">{rematchError}</p>}
+          </>
+        )}
       </div>
     );
   }
+
+  return (
+    <div>
+      <Scoreboard
+        player1Score={gameState?.player1.score || 0}
+        player2Score={gameState?.player2.score || 0}
+      />
+      <canvas
+        ref={canvasRef}
+        width={800}
+        height={600}
+        style={{ border: "1px solid white" }}
+      />
+    </div>
+  );
 };
 
 export default Game;

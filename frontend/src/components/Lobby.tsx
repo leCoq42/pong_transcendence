@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { joinQueue, leaveQueue } from "../api";
+import { GameMode } from "./Game";
 import {
   getSocket,
   joinGame,
@@ -11,9 +12,9 @@ import {
 } from "../socket";
 
 interface LobbyProps {
-  onGameStart: (gameMode: string, gameId: string) => void;
+  onGameStart: (gameMode: GameMode, gameId: string) => void;
   queueStatus: string;
-  setQueueStatus: (status: string) => void;
+  setQueueStatus: React.Dispatch<React.SetStateAction<string>>;
 }
 
 const Lobby: React.FC<LobbyProps> = ({
@@ -41,7 +42,7 @@ const Lobby: React.FC<LobbyProps> = ({
     };
 
     const handleMatchFound = (data: { gameId: string }) => {
-      onGameStart("remoteMultiplayer", data.gameId);
+      onGameStart("remoteMultiplayer" as GameMode, data.gameId);
     };
 
     const handleQueueStatus = (data: { status: string }) => {
@@ -58,7 +59,7 @@ const Lobby: React.FC<LobbyProps> = ({
     };
   }, [onGameStart]);
 
-  const handleJoinQueue = async (gameMode: string) => {
+  const handleJoinQueue = async (gameMode: GameMode) => {
     if (gameMode === "remoteMultiplayer") {
       const socket = getSocket();
       if (!socket || !socket.id) {
@@ -95,14 +96,14 @@ const Lobby: React.FC<LobbyProps> = ({
       {queueStatus === "inactive" && (
         <>
           <h2>Select Game Mode</h2>
-          <button onClick={() => handleJoinQueue("singleplayer")}>
+          <button onClick={() => handleJoinQueue("singleplayer" as GameMode)}>
             Single Player
           </button>
-          <button onClick={() => handleJoinQueue("localMultiplayer")}>
+          <button onClick={() => handleJoinQueue("localMultiplayer" as GameMode)}>
             Local Multiplayer
           </button>
           <button
-            onClick={() => handleJoinQueue("remoteMultiplayer")}
+            onClick={() => handleJoinQueue("remoteMultiplayer" as GameMode)}
             disabled={queueStatus !== "inactive" && queueStatus !== "idle"}
           >
             Remote Multiplayer
