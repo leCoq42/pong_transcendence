@@ -300,7 +300,7 @@ const Game: React.FC<GameProps> = ({
   }
 
   return (
-    <div>
+    <div className="game-container">
       <Scoreboard
         player1Score={gameState?.player1.score || 0}
         player2Score={gameState?.player2.score || 0}
@@ -309,7 +309,6 @@ const Game: React.FC<GameProps> = ({
         ref={canvasRef}
         width={800}
         height={600}
-        style={{ border: "1px solid white" }}
       />
     </div>
   );

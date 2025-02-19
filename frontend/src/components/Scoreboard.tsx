@@ -11,8 +11,14 @@ const Scoreboard: React.FC<ScoreboardProps> = ({
 }) => {
   return (
     <div className="scoreboard">
-      <p>Player 1: {player1Score}</p>
-      <p>Player 2: {player2Score}</p>
+      <div className="score-item">
+        <span className="player-name">P1</span>
+        <span className="score">{player1Score}</span>
+      </div>
+      <div className="score-item">
+        <span className="player-name">P2</span>
+        <span className="score">{player2Score}</span>
+      </div>
     </div>
   );
 };
