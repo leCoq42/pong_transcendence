@@ -96,7 +96,7 @@ const Lobby: React.FC<LobbyProps> = ({
 
   return (
     <div>
-      {queueStatus === "inactive" && (
+      {queueStatus === "inactive" && selectedMode !== "remoteMultiplayer" && (
         <>
           <h2>Select Game Mode</h2>
           <button onClick={() => handleJoinQueue("singleplayer" as GameMode)}>
@@ -105,19 +105,36 @@ const Lobby: React.FC<LobbyProps> = ({
           <button onClick={() => handleJoinQueue("localMultiplayer" as GameMode)}>
             Local Multiplayer
           </button>
-          <button
-            onClick={() => handleJoinQueue("remoteMultiplayer" as GameMode)}
-            disabled={queueStatus !== "inactive" && queueStatus !== "idle"}
-          >
+          <button onClick={() => setSelectedMode("remoteMultiplayer")}>
             Remote Multiplayer
           </button>
         </>
       )}
-      {queueStatus === "inQueue" && (
-        <button onClick={handleLeaveQueue}>Leave Queue</button>
-      )}
-      {selectedMode === "remoteMultiplayer" && queueStatus && (
-        <p>Queue Status: {queueStatus}</p>
+      
+      {selectedMode === "remoteMultiplayer" && (
+        <div className="queue-controls">
+          {queueStatus === "inactive" && (
+            <>
+              <h2>Remote Multiplayer</h2>
+              <button
+                onClick={() => handleJoinQueue("remoteMultiplayer" as GameMode)}
+                disabled={queueStatus !== "inactive" && queueStatus !== "idle"}
+              >
+                Join Queue
+              </button>
+              <button onClick={() => {
+                setSelectedMode("singleplayer");
+                setQueueStatus("inactive");
+              }}>
+                Leave
+              </button>
+            </>
+          )}
+          {queueStatus === "inQueue" && (
+            <button onClick={handleLeaveQueue}>Leave Queue</button>
+          )}
+          {queueStatus && <p>Status: {queueStatus}</p>}
+        </div>
       )}
       {countdown !== null && <p>Game starts in: {countdown}</p>}
     </div>
