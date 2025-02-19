@@ -60,3 +60,22 @@ body {
   background-color: #cccccc;
   cursor: not-allowed;
 }
+
+.socket-status {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.5rem;
+  background-color: #1e2124;
+  z-index: 1000;
+}
+
+.status-connected {
+  color: #4caf50;
+}
+
+.status-disconnected {
+  color: #f44336;
+}
