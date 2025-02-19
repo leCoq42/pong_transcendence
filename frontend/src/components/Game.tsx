@@ -53,12 +53,14 @@ interface GameProps {
   gameMode: GameMode;
   gameId: string;
   setQueueStatus: React.Dispatch<React.SetStateAction<string>>;
+  onGameStart: (gameMode: GameMode, gameId: string) => void;
 }
 
 const Game: React.FC<GameProps> = ({
   gameMode,
   gameId: initialGameId,
   setQueueStatus,
+  onGameStart,
 }) => {
   const [gameId, setGameId] = useState<string>(initialGameId);
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -277,14 +279,22 @@ const Game: React.FC<GameProps> = ({
       <div className="game-over">
         <h2>Game Over!</h2>
         <p>{winner === "player1" ? "Player 1" : "Player 2"} wins!</p>
-        {gameMode !== "remoteMultiplayer" && (
-          <>
-            <button onClick={handleRematchClick} disabled={rematchRequested}>
-              {rematchRequested ? "Rematch Requested" : "Rematch"}
-            </button>
-            {rematchError && <p className="error-message">{rematchError}</p>}
-          </>
-        )}
+        <div className="game-over-buttons">
+          {gameMode !== "remoteMultiplayer" && (
+            <>
+              <button onClick={handleRematchClick} disabled={rematchRequested}>
+                {rematchRequested ? "Rematch Requested" : "Rematch"}
+              </button>
+              {rematchError && <p className="error-message">{rematchError}</p>}
+            </>
+          )}
+          <button onClick={() => {
+            setQueueStatus("inactive");
+            onGameStart("singleplayer", "");
+          }}>
+            Leave Game
+          </button>
+        </div>
       </div>
     );
   }

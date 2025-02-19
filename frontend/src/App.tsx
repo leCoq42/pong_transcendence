@@ -25,7 +25,7 @@ const App: React.FC = () => {
   ) => {
     setGameMode(selectedGameMode);
     setGameId(selectedGameId);
-    setGameStarted(true);
+    setGameStarted(selectedGameId !== ""); // Only start game if we have a game ID
   };
 
   return (
@@ -41,7 +41,6 @@ const App: React.FC = () => {
         <Game
           gameMode={gameMode}
           gameId={gameId}
-          queueStatus={queueStatus}
           setQueueStatus={setQueueStatus}
           onGameStart={handleGameStart}
         />
