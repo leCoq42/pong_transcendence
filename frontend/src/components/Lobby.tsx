@@ -24,6 +24,7 @@ const Lobby: React.FC<LobbyProps> = ({
 }) => {
   const [playerId, setPlayerId] = useState<string>("");
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [selectedMode, setSelectedMode] = useState<GameMode>("singleplayer");
 
   useEffect(() => {
     const handleCountdown = (data: { gameId: string; duration: number }) => {
@@ -60,6 +61,7 @@ const Lobby: React.FC<LobbyProps> = ({
   }, [onGameStart]);
 
   const handleJoinQueue = async (gameMode: GameMode) => {
+    setSelectedMode(gameMode);
     if (gameMode === "remoteMultiplayer") {
       const socket = getSocket();
       if (!socket || !socket.id) {
@@ -89,6 +91,7 @@ const Lobby: React.FC<LobbyProps> = ({
       console.log(response);
     }
     setQueueStatus("inactive");
+    setSelectedMode("singleplayer");
   };
 
   return (
@@ -113,7 +116,9 @@ const Lobby: React.FC<LobbyProps> = ({
       {queueStatus === "inQueue" && (
         <button onClick={handleLeaveQueue}>Leave Queue</button>
       )}
-      {queueStatus && <p>Queue Status: {queueStatus}</p>}
+      {selectedMode === "remoteMultiplayer" && queueStatus && (
+        <p>Queue Status: {queueStatus}</p>
+      )}
       {countdown !== null && <p>Game starts in: {countdown}</p>}
     </div>
   );
