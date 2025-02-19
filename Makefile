@@ -30,8 +30,8 @@ stop:
 build:
 	$(DOCKER_COMPOSE) build
 
-postgres:
-	docker exec -it postgres_transcendence bash
+db:
+	docker exec -it db bash
 
 clean:
 	@docker stop $$(docker ps -qa) || true
@@ -48,4 +48,4 @@ redev: clean dev
 prune: clean
 	@docker system prune -a --volumes -f
 
-.PHONY: all up down start stop build clean re prune postgres dev redev
+.PHONY: all up down start stop build clean re prune db dev redev

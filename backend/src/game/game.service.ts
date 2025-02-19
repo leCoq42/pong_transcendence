@@ -193,6 +193,7 @@ export class GameService {
         const winner =
           game.player1.score >= SCORE_LIMIT ? 'player1' : 'player2';
         this.server?.to(gameId).emit('gameOver', { winner });
+        this.handleGameEnd(gameId); // Save match result
         clearInterval(intervalId);
         setTimeout(() => {
           const gameExists = this.games.get(gameId);

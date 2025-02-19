@@ -10,7 +10,7 @@ services:
     restart: always
     env_file:
       - .env
-    container_name: database
+    container_name: db
     volumes:
       - ~/.sgoinfre/transcendence/pgdata:/var/lib/postgresql/data
     ports:
@@ -71,6 +71,8 @@ services:
     ports:
       - "5050:80"
     profiles: ["dev"]
+    networks:
+      - app-network
 
 networks:
   app-network:

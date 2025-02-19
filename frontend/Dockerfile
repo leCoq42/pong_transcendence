@@ -7,7 +7,7 @@ RUN npm run build
 CMD [ "npm", "run", "preview"]
 
 
-FROM node:current-slim as development
+FROM node:current-slim AS development
 WORKDIR /app/frontend
 COPY package*.json .
 RUN npm install
