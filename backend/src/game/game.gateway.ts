@@ -89,6 +89,20 @@ export class GameGateway
     this.gameService.movePaddle(client.id, gameId, direction, player);
   }
 
+  @SubscribeMessage('leaveGame')
+  handleLeaveGame(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { gameId: string },
+  ) {
+    const gameState = this.gameService.getGameState(data.gameId);
+    if (!gameState) return;
+
+    this.server.to(data.gameId).emit('playerDisconnected');
+
+    client.leave(data.gameId);
+    this.gameService.removeGame(data.gameId);
+  }
+
   @SubscribeMessage('getGameState')
   handleGetGameState(
     @ConnectedSocket() client: Socket,

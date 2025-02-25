@@ -46,7 +46,6 @@ const App: React.FC = () => {
     socket?.on("connect", handleConnect);
     socket?.on("disconnect", handleDisconnect);
 
-    // Set initial state if socket is already connected
     if (socket?.connected) {
       handleConnect();
     }
@@ -64,7 +63,7 @@ const App: React.FC = () => {
   ) => {
     setGameMode(selectedGameMode);
     setGameId(selectedGameId);
-    setGameStarted(selectedGameId !== ""); // Only start game if we have a game ID
+    setGameStarted(selectedGameId !== "");
   };
 
   return (

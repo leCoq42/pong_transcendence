@@ -54,7 +54,6 @@ export class GameService {
     const gameState = this.games.get(gameId);
     if (gameState) {
       this.saveMatchResult(gameState);
-      // Keep the player IDs in playerGameMap until rematch is handled
       if (gameState.gameMode === 'remoteMultiplayer') {
         this.playerGameMap.delete(gameState.player1.id);
         this.playerGameMap.delete(gameState.player2.id);
@@ -128,6 +127,9 @@ export class GameService {
     gameState.player1.id = player1Id;
     gameState.player2.id = player2Id;
     this.games.set(gameId, gameState);
+
+    this.playerGameMap.set(player1Id, gameId);
+    this.playerGameMap.set(player2Id, gameId);
     this.startGameLoop(gameId);
     return gameId;
   }
@@ -171,16 +173,50 @@ export class GameService {
   handleDisconnect(playerId: string) {
     const gameId = this.playerGameMap.get(playerId);
     if (gameId) {
+      const game = this.games.get(gameId);
+      if (game) {
+        if (game.player1.id === playerId) {
+          game.player1.inGame = false;
+        } else if (game.player2.id === playerId) {
+          game.player2.inGame = false;
+        }
+
+        this.server?.to(gameId).emit('playerDisconnected');
+        this.games.delete(gameId);
+
+        this.playerGameMap.delete(playerId);
+        if (game.player1.id !== playerId) {
+          this.playerGameMap.delete(game.player1.id);
+        }
+        if (game.player2.id !== playerId) {
+          this.playerGameMap.delete(game.player2.id);
+        }
+      }
+    }
+  }
+
+  removeGame(gameId: string) {
+    const game = this.games.get(gameId);
+    if (game) {
+      if (game.player1?.id) {
+        this.playerGameMap.delete(game.player1.id);
+      }
+      if (game.player2?.id) {
+        this.playerGameMap.delete(game.player2.id);
+      }
       this.games.delete(gameId);
-      this.playerGameMap.delete(playerId);
     }
   }
 
   private startGameLoop(gameId: string) {
     const intervalId = setInterval(() => {
       const game = this.games.get(gameId);
-      if (!game) {
+      if (!game || !game.player1.inGame || !game.player2.inGame) {
         clearInterval(intervalId);
+        if (game && (!game.player1.inGame || !game.player2.inGame)) {
+          this.server?.to(gameId).emit('playerDisconnected');
+          this.games.delete(gameId);
+        }
         return;
       }
 
@@ -193,7 +229,7 @@ export class GameService {
         const winner =
           game.player1.score >= SCORE_LIMIT ? 'player1' : 'player2';
         this.server?.to(gameId).emit('gameOver', { winner });
-        this.handleGameEnd(gameId); // Save match result
+        this.handleGameEnd(gameId);
         clearInterval(intervalId);
         setTimeout(() => {
           const gameExists = this.games.get(gameId);

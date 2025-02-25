@@ -67,7 +67,8 @@ const Game: React.FC<GameProps> = ({
   const [winner, setWinner] = useState<string | null>(null);
   const [rematchRequested, setRematchRequested] = useState(false);
   const [rematchError, setRematchError] = useState<string | null>(null);
-  
+  const [opponentDisconnected, setOpponentDisconnected] = useState(false);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const keyRef = useRef<{ [key: string]: boolean }>({});
   const animationFrameRef = useRef<number>();
@@ -126,10 +127,24 @@ const Game: React.FC<GameProps> = ({
       setWinner(data.winner);
     });
 
+    socket.on("playerDisconnected", () => {
+      setOpponentDisconnected(true);
+    });
+
     return () => {
       socket.off("gameOver");
+      socket.off("playerDisconnected");
     };
   }, []);
+
+  const handleLeaveGame = useCallback(() => {
+    const socket = getSocket();
+    if (socket) {
+      socket.emit("leaveGame", { gameId });
+    }
+    setQueueStatus("inactive");
+    onGameStart("singleplayer", "");
+  }, [gameId, setQueueStatus, onGameStart]);
 
   const handleRematchClick = () => {
     setRematchRequested(true);
@@ -274,13 +289,22 @@ const Game: React.FC<GameProps> = ({
     }
   }, [gameState, drawPaddle, drawBall]);
 
-  if (winner) {
+  if (winner || opponentDisconnected) {
     return (
       <div className="game-over">
-        <h2>Game Over!</h2>
-        <p>{winner === "player1" ? "Player 1" : "Player 2"} wins!</p>
+        {winner ? (
+          <>
+            <h2>Game Over!</h2>
+            <p>{winner === "player1" ? "Player 1" : "Player 2"} wins!</p>
+          </>
+        ) : (
+          <>
+            <h2>Opponent Disconnected</h2>
+            <p>Your opponent has left the game.</p>
+          </>
+        )}
         <div className="game-over-buttons">
-          {gameMode !== "remoteMultiplayer" && (
+          {!opponentDisconnected && gameMode !== "remoteMultiplayer" && (
             <>
               <button onClick={handleRematchClick} disabled={rematchRequested}>
                 {rematchRequested ? "Rematch Requested" : "Rematch"}
@@ -288,10 +312,7 @@ const Game: React.FC<GameProps> = ({
               {rematchError && <p className="error-message">{rematchError}</p>}
             </>
           )}
-          <button onClick={() => {
-            setQueueStatus("inactive");
-            onGameStart("singleplayer", "");
-          }}>
+          <button onClick={handleLeaveGame}>
             Leave Game
           </button>
         </div>

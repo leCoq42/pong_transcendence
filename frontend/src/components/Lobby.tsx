@@ -28,6 +28,7 @@ const Lobby: React.FC<LobbyProps> = ({
 
   useEffect(() => {
     const handleCountdown = (data: { gameId: string; duration: number }) => {
+      setQueueStatus("matched");
       setCountdown(data.duration);
       const interval = setInterval(() => {
         setCountdown((prev) => {
@@ -102,7 +103,9 @@ const Lobby: React.FC<LobbyProps> = ({
           <button onClick={() => handleJoinQueue("singleplayer" as GameMode)}>
             Single Player
           </button>
-          <button onClick={() => handleJoinQueue("localMultiplayer" as GameMode)}>
+          <button
+            onClick={() => handleJoinQueue("localMultiplayer" as GameMode)}
+          >
             Local Multiplayer
           </button>
           <button onClick={() => setSelectedMode("remoteMultiplayer")}>
@@ -110,7 +113,7 @@ const Lobby: React.FC<LobbyProps> = ({
           </button>
         </>
       )}
-      
+
       {selectedMode === "remoteMultiplayer" && (
         <div className="queue-controls">
           {queueStatus === "inactive" && (
@@ -122,15 +125,17 @@ const Lobby: React.FC<LobbyProps> = ({
               >
                 Join Queue
               </button>
-              <button onClick={() => {
-                setSelectedMode("singleplayer");
-                setQueueStatus("inactive");
-              }}>
+              <button
+                onClick={() => {
+                  setSelectedMode("singleplayer");
+                  setQueueStatus("inactive");
+                }}
+              >
                 Leave
               </button>
             </>
           )}
-          {queueStatus === "inQueue" && (
+          {queueStatus === "inQueue" && countdown === null && (
             <button onClick={handleLeaveQueue}>Leave Queue</button>
           )}
           {queueStatus && <p>Status: {queueStatus}</p>}
