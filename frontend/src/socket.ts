@@ -8,12 +8,13 @@ export const connectSocket = () => {
   if (!socket) {
     socket = io(VITE_API_URL, {
       withCredentials: true,
-      transports: ["websocket", "polling"],
+      transports: ["websocket"],
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
-      timeout: 20000,
+      timeout: 5000,
+      forceNew: true,
     });
 
     socket.on("connect", () => {
@@ -89,19 +90,44 @@ export const joinGame = (
   }
 };
 
+type PlayerKey = 'player1' | 'player2' | 'default';
+
+const lastMoveTimes: Record<PlayerKey, number> = {
+  player1: 0,
+  player2: 0,
+  default: 0
+};
+const MOVE_THROTTLE = 16;
+
 export const movePaddle = (
   gameId: string,
   direction: "up" | "down",
   player?: number
 ) => {
-  const socket = getSocket();
-  if (socket) {
-    socket.emit("movePaddle", { gameId, direction, player });
+  const now = performance.now();
+  const playerKey: PlayerKey = player ? `player${player}` as PlayerKey : 'default';
+  const lastTime = lastMoveTimes[playerKey];
+
+  if (now - lastTime >= MOVE_THROTTLE) {
+    const socket = getSocket();
+    if (socket) {
+      socket.emit("movePaddle", { gameId, direction, player });
+      lastMoveTimes[playerKey] = now;
+    }
   }
 };
 
+let lastGameStateTime = 0;
+const STATE_UPDATE_THROTTLE = 16;
+
 export const onGameStateUpdate = (callback: (gameState: GameState) => void) => {
-  socket?.on("gameState", callback);
+  socket?.on("gameState", (gameState: GameState) => {
+    const now = performance.now();
+    if (now - lastGameStateTime >= STATE_UPDATE_THROTTLE) {
+      callback(gameState);
+      lastGameStateTime = now;
+    }
+  });
 };
 
 export const offGameStateUpdate = () => {
@@ -113,7 +139,6 @@ export const requestRematch = (gameId: string, onError?: (message: string) => vo
   if (socket) {
     socket.emit("requestRematch", { gameId });
     
-    // Listen for error events
     socket.once("error", (data: { message: string }) => {
       if (onError) {
         onError(data.message);

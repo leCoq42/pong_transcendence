@@ -71,6 +71,7 @@ const Game: React.FC<GameProps> = ({
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const keyRef = useRef<{ [key: string]: boolean }>({});
+  const lastMoveTimeRef = useRef<number>(0);
   const animationFrameRef = useRef<number>();
   const gameIdRef = useRef(gameId);
 
@@ -90,30 +91,38 @@ const Game: React.FC<GameProps> = ({
   }, []);
 
   const processPaddleMovement = useCallback(() => {
-    if (gameMode === "localMultiplayer") {
-      const p1Up = keyRef.current["w"];
-      const p1Down = keyRef.current["s"];
-      if (p1Up && !p1Down) {
-        movePaddle(gameId, "up", 1);
-      } else if (p1Down && !p1Up) {
-        movePaddle(gameId, "down", 1);
+    const currentTime = Date.now();
+    const moveInterval = 16;
+
+    if (currentTime - lastMoveTimeRef.current >= moveInterval) {
+      if (gameMode === "localMultiplayer") {
+        const p1Up = keyRef.current["w"];
+        const p1Down = keyRef.current["s"];
+        const p2Up = keyRef.current["ArrowUp"];
+        const p2Down = keyRef.current["ArrowDown"];
+
+        if (p1Up && !p1Down) {
+          movePaddle(gameId, "up", 1);
+        } else if (p1Down && !p1Up) {
+          movePaddle(gameId, "down", 1);
+        }
+
+        if (p2Up && !p2Down) {
+          movePaddle(gameId, "up", 2);
+        } else if (p2Down && !p2Up) {
+          movePaddle(gameId, "down", 2);
+        }
+      } else {
+        const up = keyRef.current["ArrowUp"];
+        const down = keyRef.current["ArrowDown"];
+        if (up && !down) {
+          movePaddle(gameId, "up");
+        } else if (down && !up) {
+          movePaddle(gameId, "down");
+        }
       }
 
-      const p2Up = keyRef.current["ArrowUp"];
-      const p2Down = keyRef.current["ArrowDown"];
-      if (p2Up && !p2Down) {
-        movePaddle(gameId, "up", 2);
-      } else if (p2Down && !p2Up) {
-        movePaddle(gameId, "down", 2);
-      }
-    } else {
-      const up = keyRef.current["ArrowUp"];
-      const down = keyRef.current["ArrowDown"];
-      if (up && !down) {
-        movePaddle(gameId, "up");
-      } else if (down && !up) {
-        movePaddle(gameId, "down");
-      }
+      lastMoveTimeRef.current = currentTime;
     }
 
     animationFrameRef.current = requestAnimationFrame(processPaddleMovement);
