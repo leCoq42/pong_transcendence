@@ -11,7 +11,7 @@ import { v4 as uuid } from 'uuid';
 import { Server } from 'socket.io';
 
 const SERVER_TICKRATE = 1000 / 60;
-const SCORE_LIMIT = 2;
+const SCORE_LIMIT = 3;
 
 @Injectable()
 export class GameService {

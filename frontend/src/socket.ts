@@ -8,13 +8,13 @@ export const connectSocket = () => {
   if (!socket) {
     socket = io(VITE_API_URL, {
       withCredentials: true,
-      transports: ["websocket"],
+      transports: ["polling", "websocket"],
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      timeout: 5000,
-      forceNew: true,
+      reconnectionDelay: 2000,
+      timeout: 10000,
+      forceNew: false,
     });
 
     socket.on("connect", () => {

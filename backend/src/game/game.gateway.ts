@@ -17,16 +17,20 @@ import { QueueService } from 'src/queue/queue.service';
 
 @WebSocketGateway({
   cors: {
-    origin: [
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
-      'http://0.0.0.0:5173',
-    ],
+    origin: process.env.FRONTEND_PORT
+      ? [
+          `http://localhost:${process.env.FRONTEND_PORT}`,
+          `http://127.0.0.1:${process.env.FRONTEND_PORT}`,
+          `http://0.0.0.0:${process.env.FRONTEND_PORT}`,
+        ]
+      : ['http://localhost:5173'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
-    transports: ['websocket', 'polling'],
   },
+  transports: ['polling', 'websocket'],
+  pingInterval: 1000,
+  pingTimeout: 5000,
 })
 export class GameGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect

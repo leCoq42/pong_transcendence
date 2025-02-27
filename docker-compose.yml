@@ -4,9 +4,9 @@ services:
     image: postgres
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      interval: 1s
+      timeout: 2s
+      retries: 10
     restart: always
     env_file:
       - .env
@@ -43,11 +43,11 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: ${NODE_ENV:-production}
+    restart: unless-stopped
     ports:
       - "3000:3000"
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     env_file:
       - .env
     volumes:
