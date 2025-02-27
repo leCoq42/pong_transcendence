@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { joinQueue, leaveQueue } from "../api";
 import { GameMode } from "./Game";
 import {
   getSocket,
@@ -9,6 +8,7 @@ import {
   onMatchFound,
   offMatchFound,
   onQueueStatus,
+  offQueueStatus,
 } from "../socket";
 
 interface LobbyProps {
@@ -22,7 +22,6 @@ const Lobby: React.FC<LobbyProps> = ({
   queueStatus,
   setQueueStatus,
 }) => {
-  const [playerId, setPlayerId] = useState<string>("");
   const [countdown, setCountdown] = useState<number | null>(null);
   const [selectedMode, setSelectedMode] = useState<GameMode>("singleplayer");
 
@@ -58,38 +57,37 @@ const Lobby: React.FC<LobbyProps> = ({
     return () => {
       offCountdown();
       offMatchFound();
+      offQueueStatus();
     };
   }, [onGameStart]);
 
-  const handleJoinQueue = async (gameMode: GameMode) => {
-    setSelectedMode(gameMode);
-    if (gameMode === "remoteMultiplayer") {
-      const socket = getSocket();
-      if (!socket || !socket.id) {
-        console.log("socket error");
-        return;
-      }
-
-      setPlayerId(socket.id);
-      setQueueStatus("joining");
-
-      const response = await joinQueue(socket.id);
-      if (response.message === "Joined queue") {
-        console.log(response);
+  const handleJoinQueue = (gameMode: GameMode) => {
+  const socket = getSocket();
+  if (!socket || !socket.id) {
+    console.log("socket error");
+    return;
+  }
+  setSelectedMode(gameMode);
+  if (gameMode === "remoteMultiplayer") {
+    setQueueStatus("joining");
+    socket.emit("joinQueue", { playerId: socket.id });
+    socket.once("queueStatus", (data: { status: string }) => {
+      if (data.status === "inQueue") {
         setQueueStatus("inQueue");
       }
-    } else {
-      joinGame(gameMode, undefined, setQueueStatus, (gameId) => {
-        onGameStart(gameMode, gameId);
-      });
-    }
-  };
+    });
+  } else {
+    joinGame(gameMode, undefined, setQueueStatus, (gameId) => {
+      onGameStart(gameMode, gameId);
+    });
+  }
+};
 
-  const handleLeaveQueue = async () => {
-    setQueueStatus("leaving");
-    if (playerId) {
-      const response = await leaveQueue(playerId);
-      console.log(response);
+  const handleLeaveQueue = () => {
+    const socket = getSocket();
+    if (socket && socket.id) {
+      setQueueStatus("leaving");
+      socket.emit("leaveQueue", { playerId: socket.id });
     }
     setQueueStatus("inactive");
     setSelectedMode("singleplayer");

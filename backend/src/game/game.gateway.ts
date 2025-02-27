@@ -28,7 +28,7 @@ import { QueueService } from 'src/queue/queue.service';
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
   },
-  transports: ['polling', 'websocket'],
+  transports: ['websocket'],
   pingInterval: 1000,
   pingTimeout: 5000,
 })
@@ -114,6 +114,19 @@ export class GameGateway
   ) {
     const gameState = this.gameService.getGameState(data.gameId);
     client.emit('gameState', gameState);
+  }
+
+  @SubscribeMessage('joinQueue')
+  handleJoinQueue(@ConnectedSocket() client: Socket) {
+    const result = this.queueService.addPlayerToQueue(client.id);
+    if (result.message === 'Joined queue') {
+      client.emit('queueStatus', { status: 'inQueue' });
+    }
+  }
+
+  @SubscribeMessage('leaveQueue')
+  handleLeaveQueue(@ConnectedSocket() client: Socket) {
+    this.queueService.removePlayerFromQueue(client.id);
   }
 
   @SubscribeMessage('requestRematch')

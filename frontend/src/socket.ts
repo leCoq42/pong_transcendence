@@ -8,7 +8,7 @@ export const connectSocket = () => {
   if (!socket) {
     socket = io(VITE_API_URL, {
       withCredentials: true,
-      transports: ["polling", "websocket"],
+      transports: ["websocket"],
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 5,
@@ -68,6 +68,12 @@ export const onQueueStatus = (callback: (data: { status: string }) => void) => {
 export const offQueueStatus = () => {
   socket?.off("queueStatus");
 };
+
+export const joinQueue = (
+  gameMode: string,
+) => {
+  socket?.emit("joinQueue", {gameMode})
+}
 
 export const joinGame = (
   gameMode: string,
