@@ -68,6 +68,7 @@ const Game: React.FC<GameProps> = ({
   const [rematchRequested, setRematchRequested] = useState(false);
   const [rematchError, setRematchError] = useState<string | null>(null);
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const keyRef = useRef<{ [key: string]: boolean }>({});
@@ -132,8 +133,9 @@ const Game: React.FC<GameProps> = ({
     const socket = getSocket();
     if (!socket) return;
 
-    socket.on("gameOver", (data: { winner: string }) => {
+    socket.on("gameOver", (data: { winner: string; rematchTimeout: number }) => {
       setWinner(data.winner);
+      setTimeLeft(Math.ceil((data.rematchTimeout - Date.now()) / 1000));
     });
 
     socket.on("playerDisconnected", () => {
@@ -145,6 +147,22 @@ const Game: React.FC<GameProps> = ({
       socket.off("playerDisconnected");
     };
   }, []);
+
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0) return;
+
+    const timerId = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(timerId);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, [timeLeft]);
 
   const handleLeaveGame = useCallback(() => {
     const socket = getSocket();
@@ -181,7 +199,9 @@ const Game: React.FC<GameProps> = ({
       if (socket) {
         socket.once("gameStarted", () => {
           onGameStateUpdate(setGameState);
-          animationFrameRef.current = requestAnimationFrame(processPaddleMovement);
+          animationFrameRef.current = requestAnimationFrame(
+            processPaddleMovement
+          );
         });
       }
     },
@@ -313,17 +333,15 @@ const Game: React.FC<GameProps> = ({
           </>
         )}
         <div className="game-over-buttons">
-          {!opponentDisconnected && gameMode !== "remoteMultiplayer" && (
+          {!opponentDisconnected && gameMode !== "remoteMultiplayer" && timeLeft !== null && timeLeft > 0 && (
             <>
               <button onClick={handleRematchClick} disabled={rematchRequested}>
-                {rematchRequested ? "Rematch Requested" : "Rematch"}
+                {rematchRequested ? "Rematch Requested" : `Rematch (${timeLeft}s)`}
               </button>
               {rematchError && <p className="error-message">{rematchError}</p>}
             </>
           )}
-          <button onClick={handleLeaveGame}>
-            Leave Game
-          </button>
+          <button onClick={handleLeaveGame}>Leave Game</button>
         </div>
       </div>
     );
@@ -334,12 +352,10 @@ const Game: React.FC<GameProps> = ({
       <Scoreboard
         player1Score={gameState?.player1.score || 0}
         player2Score={gameState?.player2.score || 0}
+        player1Id={gameState?.player1.id || ""}
+        player2Id={gameState?.player2.id || ""}
       />
-      <canvas
-        ref={canvasRef}
-        width={800}
-        height={600}
-      />
+      <canvas ref={canvasRef} width={800} height={600} />
     </div>
   );
 };

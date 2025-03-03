@@ -103,8 +103,9 @@ export class GameService {
     const gameId = uuid();
     const gameState = this.initializeGameState('singleplayer');
     gameState.player1.id = playerId;
+    gameState.player2.id = 'Bot';
     this.games.set(gameId, gameState);
-    this.playerGameMap.set(playerId, gameId);
+    this.playerGameMap.set(gameState.player1.id, gameId);
     this.startGameLoop(gameId);
     return gameId;
   }
@@ -113,7 +114,7 @@ export class GameService {
     const gameId = uuid();
     const gameState = this.initializeGameState('localMultiplayer');
     gameState.player1.id = playerId;
-    gameState.player2.id = uuid();
+    gameState.player2.id = 'Local Challenger';
     this.games.set(gameId, gameState);
     this.playerGameMap.set(playerId, gameId);
     this.playerGameMap.set(gameState.player2.id, gameId);
@@ -228,7 +229,10 @@ export class GameService {
       ) {
         const winner =
           game.player1.score >= SCORE_LIMIT ? 'player1' : 'player2';
-        this.server?.to(gameId).emit('gameOver', { winner });
+        this.server?.to(gameId).emit('gameOver', {
+          winner,
+          rematchTimeout: Date.now() + 10000  // 10 seconds from now
+        });
         this.handleGameEnd(gameId);
         clearInterval(intervalId);
         setTimeout(() => {
@@ -249,7 +253,7 @@ export class GameService {
 
   private updateGame(gameId: string, game: GameState) {
     const now = Date.now();
-    const isSinglePlayer = !game.player2.id;
+    const isSinglePlayer = game.gameMode === 'singleplayer';
     const roundStartTime = game.roundStartTime || now;
 
     if (!game.powerUp && now - roundStartTime >= 2000) {
@@ -296,7 +300,7 @@ export class GameService {
                 affectedPlayer.paddle.height = originalHeight;
               }
             }
-          }, 5000);
+          }, 10000);
         }
         game.powerUp = undefined;
         game.lastPowerUpSpawn = now;
@@ -310,20 +314,23 @@ export class GameService {
     game.ball.x += game.ball.velocityX;
     game.ball.y += game.ball.velocityY;
 
-    if (
-      game.ball.y + game.ball.radius > 100 ||
-      game.ball.y - game.ball.radius < 0
-    ) {
+    // Handle vertical boundaries
+    if (game.ball.y + game.ball.radius > 100) {
+      game.ball.y = 100 - game.ball.radius;
+      game.ball.velocityY = -game.ball.velocityY;
+    } else if (game.ball.y - game.ball.radius < 0) {
+      game.ball.y = game.ball.radius;
       game.ball.velocityY = -game.ball.velocityY;
     }
 
     this.checkPaddleCollision(game.player1.paddle, game.ball);
     this.checkPaddleCollision(game.player2.paddle, game.ball);
 
-    if (game.ball.x - game.ball.radius < 0) {
+    // Handle scoring and horizontal boundaries
+    if (game.ball.x + game.ball.radius < 0) {
       game.player2.score++;
       game.roundStartTime = this.resetBall(game.ball, game);
-    } else if (game.ball.x + game.ball.radius > 100) {
+    } else if (game.ball.x - game.ball.radius > 100) {
       game.player1.score++;
       game.roundStartTime = this.resetBall(game.ball, game);
     }

@@ -18,7 +18,7 @@ export const connectSocket = () => {
     });
 
     socket.on("connect", () => {
-      console.log("Socket connected:", socket?.id);
+      if (socket) console.log("Socket connected:", socket.id);
     });
 
     socket.on("connect_error", (error) => {
@@ -69,11 +69,9 @@ export const offQueueStatus = () => {
   socket?.off("queueStatus");
 };
 
-export const joinQueue = (
-  gameMode: string,
-) => {
-  socket?.emit("joinQueue", {gameMode})
-}
+export const joinQueue = (gameMode: string) => {
+  socket?.emit("joinQueue", { gameMode });
+};
 
 export const joinGame = (
   gameMode: string,
@@ -96,12 +94,12 @@ export const joinGame = (
   }
 };
 
-type PlayerKey = 'player1' | 'player2' | 'default';
+type PlayerKey = "player1" | "player2" | "default";
 
 const lastMoveTimes: Record<PlayerKey, number> = {
   player1: 0,
   player2: 0,
-  default: 0
+  default: 0,
 };
 const MOVE_THROTTLE = 16;
 
@@ -111,7 +109,9 @@ export const movePaddle = (
   player?: number
 ) => {
   const now = performance.now();
-  const playerKey: PlayerKey = player ? `player${player}` as PlayerKey : 'default';
+  const playerKey: PlayerKey = player
+    ? (`player${player}` as PlayerKey)
+    : "default";
   const lastTime = lastMoveTimes[playerKey];
 
   if (now - lastTime >= MOVE_THROTTLE) {
@@ -140,11 +140,14 @@ export const offGameStateUpdate = () => {
   socket?.off("gameState");
 };
 
-export const requestRematch = (gameId: string, onError?: (message: string) => void) => {
+export const requestRematch = (
+  gameId: string,
+  onError?: (message: string) => void
+) => {
   const socket = getSocket();
   if (socket) {
     socket.emit("requestRematch", { gameId });
-    
+
     socket.once("error", (data: { message: string }) => {
       if (onError) {
         onError(data.message);

@@ -18,11 +18,7 @@ import { QueueService } from 'src/queue/queue.service';
 @WebSocketGateway({
   cors: {
     origin: process.env.FRONTEND_PORT
-      ? [
-          `http://localhost:${process.env.FRONTEND_PORT}`,
-          `http://127.0.0.1:${process.env.FRONTEND_PORT}`,
-          `http://0.0.0.0:${process.env.FRONTEND_PORT}`,
-        ]
+      ? [`http://localhost:${process.env.FRONTEND_PORT}`]
       : ['http://localhost:5173'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true,

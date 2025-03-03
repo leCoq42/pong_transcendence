@@ -1,4 +1,4 @@
-import { Inject, Injectable, forwardRef } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { GameService } from '../game/game.service';
 import { GameGateway } from '../game/game.gateway';
 
