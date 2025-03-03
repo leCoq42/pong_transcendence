@@ -3,9 +3,7 @@ import { QueueService } from './queue.service';
 import { GameModule } from 'src/game/game.module';
 
 @Module({
-  imports: [
-    forwardRef(() => GameModule), // Import GameModule with forwardRef
-  ],
+  imports: [forwardRef(() => GameModule)],
   providers: [QueueService],
   exports: [QueueService],
 })

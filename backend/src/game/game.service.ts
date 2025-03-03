@@ -11,7 +11,18 @@ import { v4 as uuid } from 'uuid';
 import { Server } from 'socket.io';
 
 const SERVER_TICKRATE = 1000 / 60;
-const SCORE_LIMIT = 3;
+
+const GAME_PARAMETERS = {
+  score_limit: 3,
+  ball: {
+    initialX: 50,
+    initialY: 50,
+    radius: 2,
+    initialVelocityX: 0.5,
+    initialVelocityY: 0.5,
+    initialSpeed: 0.75,
+  },
+};
 
 @Injectable()
 export class GameService {
@@ -71,12 +82,12 @@ export class GameService {
     };
 
     const initialBall: Ball = {
-      x: 50,
-      y: 50,
-      radius: 2,
-      velocityX: 0.5,
-      velocityY: 0.5,
-      speed: 0.75,
+      x: GAME_PARAMETERS.ball.initialX,
+      y: GAME_PARAMETERS.ball.initialY,
+      radius: GAME_PARAMETERS.ball.radius,
+      velocityX: GAME_PARAMETERS.ball.initialVelocityX,
+      velocityY: GAME_PARAMETERS.ball.initialVelocityY,
+      speed: GAME_PARAMETERS.ball.initialSpeed,
     };
 
     return {
@@ -224,14 +235,16 @@ export class GameService {
       this.updateGame(gameId, game);
 
       if (
-        game.player1.score >= SCORE_LIMIT ||
-        game.player2.score >= SCORE_LIMIT
+        game.player1.score >= GAME_PARAMETERS.score_limit ||
+        game.player2.score >= GAME_PARAMETERS.score_limit
       ) {
         const winner =
-          game.player1.score >= SCORE_LIMIT ? 'player1' : 'player2';
+          game.player1.score >= GAME_PARAMETERS.score_limit
+            ? 'player1'
+            : 'player2';
         this.server?.to(gameId).emit('gameOver', {
           winner,
-          rematchTimeout: Date.now() + 10000  // 10 seconds from now
+          rematchTimeout: Date.now() + 10000,
         });
         this.handleGameEnd(gameId);
         clearInterval(intervalId);
@@ -246,7 +259,7 @@ export class GameService {
               this.playerGameMap.delete(game.player2.id);
             }
           }
-        }, 10000);
+        }, 11000);
       }
     }, SERVER_TICKRATE);
   }
@@ -314,7 +327,6 @@ export class GameService {
     game.ball.x += game.ball.velocityX;
     game.ball.y += game.ball.velocityY;
 
-    // Handle vertical boundaries
     if (game.ball.y + game.ball.radius > 100) {
       game.ball.y = 100 - game.ball.radius;
       game.ball.velocityY = -game.ball.velocityY;
@@ -326,7 +338,6 @@ export class GameService {
     this.checkPaddleCollision(game.player1.paddle, game.ball);
     this.checkPaddleCollision(game.player2.paddle, game.ball);
 
-    // Handle scoring and horizontal boundaries
     if (game.ball.x + game.ball.radius < 0) {
       game.player2.score++;
       game.roundStartTime = this.resetBall(game.ball, game);
@@ -443,11 +454,13 @@ export class GameService {
   }
 
   private resetBall(ball: Ball, game: GameState) {
-    ball.x = 50;
-    ball.y = 50;
-    ball.velocityX = 0.5 * (ball.velocityX > 0 ? -1 : 1);
-    ball.velocityY = 0.5 * (ball.velocityY > 0 ? -1 : 1);
-    ball.speed = 0.75;
+    ball.x = GAME_PARAMETERS.ball.initialX;
+    ball.y = GAME_PARAMETERS.ball.initialY;
+    ball.velocityX =
+      GAME_PARAMETERS.ball.initialVelocityX * (ball.velocityX > 0 ? -1 : 1);
+    ball.velocityY =
+      GAME_PARAMETERS.ball.initialVelocityY * (ball.velocityY > 0 ? -1 : 1);
+    ball.speed = GAME_PARAMETERS.ball.initialSpeed;
 
     game.powerUp = undefined;
     game.lastPowerUpSpawn = undefined;
