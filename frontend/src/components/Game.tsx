@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   getSocket,
   movePaddle,
@@ -47,6 +53,14 @@ export interface GameState {
   gameStarted: Date;
   gameMode: GameMode;
   powerUp?: PowerUp;
+}
+
+interface CoordinateCache {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  radius?: number;
 }
 
 interface GameProps {
@@ -133,10 +147,13 @@ const Game: React.FC<GameProps> = ({
     const socket = getSocket();
     if (!socket) return;
 
-    socket.on("gameOver", (data: { winner: string; rematchTimeout: number }) => {
-      setWinner(data.winner);
-      setTimeLeft(Math.ceil((data.rematchTimeout - Date.now()) / 1000));
-    });
+    socket.on(
+      "gameOver",
+      (data: { winner: string; rematchTimeout: number }) => {
+        setWinner(data.winner);
+        setTimeLeft(Math.ceil((data.rematchTimeout - Date.now()) / 1000));
+      }
+    );
 
     socket.on("playerDisconnected", () => {
       setOpponentDisconnected(true);
@@ -205,7 +222,7 @@ const Game: React.FC<GameProps> = ({
         });
       }
     },
-    [gameMode, processPaddleMovement, setQueueStatus]
+    [processPaddleMovement, setQueueStatus]
   );
 
   useEffect(() => {
@@ -244,39 +261,70 @@ const Game: React.FC<GameProps> = ({
     };
   }, [gameId, gameMode, handleKeyDown, handleKeyUp, processPaddleMovement]);
 
-  const drawPaddle = useCallback(
+  const calculateCoordinates = useCallback(
     (
-      context: CanvasRenderingContext2D,
-      paddle: Paddle,
-      canvasWidth: number,
-      canvasHeight: number
-    ) => {
+      entity: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        radius?: number;
+      },
+      canvas: HTMLCanvasElement
+    ): CoordinateCache => {
+      return {
+        x: entity.x * canvas.width * 0.01,
+        y: entity.y * canvas.height * 0.01,
+        width: entity.width * canvas.width * 0.01,
+        height: entity.height * canvas.height * 0.01,
+        ...(entity.radius && { radius: entity.radius * canvas.width * 0.01 }),
+      };
+    },
+    []
+  );
+
+  const coordinates = useMemo(() => {
+    if (!canvasRef.current || !gameState) return null;
+    return {
+      player1: calculateCoordinates(
+        gameState.player1.paddle,
+        canvasRef.current
+      ),
+      player2: calculateCoordinates(
+        gameState.player2.paddle,
+        canvasRef.current
+      ),
+      ball: calculateCoordinates(
+        {
+          ...gameState.ball,
+          height: gameState.ball.radius * 2,
+          width: gameState.ball.radius * 2,
+        },
+        canvasRef.current
+      ),
+      powerUp: gameState.powerUp
+        ? {
+            x: gameState.powerUp.x * canvasRef.current.width * 0.01,
+            y: gameState.powerUp.y * canvasRef.current.height * 0.01,
+            width: gameState.powerUp.width * canvasRef.current.width * 0.01,
+            height: gameState.powerUp.width * canvasRef.current.width * 0.01,
+          }
+        : null,
+    };
+  }, [gameState, calculateCoordinates]);
+
+  const drawPaddle = useCallback(
+    (context: CanvasRenderingContext2D, coords: CoordinateCache) => {
       context.fillStyle = "#FFF";
-      context.fillRect(
-        paddle.x * canvasWidth * 0.01,
-        paddle.y * canvasHeight * 0.01,
-        paddle.width * canvasWidth * 0.01,
-        paddle.height * canvasHeight * 0.01
-      );
+      context.fillRect(coords.x, coords.y, coords.width, coords.height);
     },
     []
   );
 
   const drawBall = useCallback(
-    (
-      context: CanvasRenderingContext2D,
-      ball: Ball,
-      canvasWidth: number,
-      canvasHeight: number
-    ) => {
+    (context: CanvasRenderingContext2D, coords: CoordinateCache) => {
       context.beginPath();
-      context.arc(
-        ball.x * canvasWidth * 0.01,
-        ball.y * canvasHeight * 0.01,
-        ball.radius * canvasWidth * 0.01,
-        0,
-        Math.PI * 2
-      );
+      context.arc(coords.x, coords.y, coords.radius!, 0, Math.PI * 2);
       context.fillStyle = "#FFF";
       context.fill();
       context.closePath();
@@ -284,39 +332,52 @@ const Game: React.FC<GameProps> = ({
     []
   );
 
-  useEffect(() => {
+  const renderGame = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !gameState) return;
+    if (canvas && coordinates && gameState) {
+      const context = canvas.getContext("2d");
+      if (!context) {
+        console.error("Couldn't get canvas context");
+        return;
+      }
 
-    const context = canvas.getContext("2d");
-    if (!context) {
-      console.error("Couldn't get canvas context");
-      return;
+      context.fillStyle = "#000";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (gameState.player1 && gameState.player2) {
+        drawPaddle(context, coordinates.player1);
+        drawPaddle(context, coordinates.player2);
+        drawBall(context, coordinates.ball);
+      }
+
+      if (coordinates.powerUp && gameState.powerUp) {
+        context.fillStyle = "#0F0";
+        context.fillRect(
+          coordinates.powerUp.x,
+          coordinates.powerUp.y,
+          coordinates.powerUp.width,
+          coordinates.powerUp.height
+        );
+      }
     }
+  }, [coordinates, gameState, drawPaddle, drawBall]);
 
-    const width = canvas.width;
-    const height = canvas.height;
+  useEffect(() => {
+    let frameId: number;
 
-    context.fillStyle = "#000";
-    context.fillRect(0, 0, width, height);
+    const animate = () => {
+      renderGame();
+      frameId = requestAnimationFrame(animate);
+    };
 
-    if (gameState.player1 && gameState.player2) {
-      drawPaddle(context, gameState.player1.paddle, width, height);
-      drawPaddle(context, gameState.player2.paddle, width, height);
-      drawBall(context, gameState.ball, width, height);
-    }
+    frameId = requestAnimationFrame(animate);
 
-    if (gameState.powerUp) {
-      const powerUpSize = gameState.powerUp.width * width * 0.01;
-      context.fillStyle = "#0F0";
-      context.fillRect(
-        gameState.powerUp.x * width * 0.01,
-        gameState.powerUp.y * height * 0.01,
-        powerUpSize,
-        powerUpSize
-      );
-    }
-  }, [gameState, drawPaddle, drawBall]);
+    return () => {
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, [renderGame]);
 
   if (winner || opponentDisconnected) {
     return (
@@ -333,14 +394,24 @@ const Game: React.FC<GameProps> = ({
           </>
         )}
         <div className="game-over-buttons">
-          {!opponentDisconnected && gameMode !== "remoteMultiplayer" && timeLeft !== null && timeLeft > 0 && (
-            <>
-              <button onClick={handleRematchClick} disabled={rematchRequested}>
-                {rematchRequested ? "Rematch Requested" : `Rematch (${timeLeft}s)`}
-              </button>
-              {rematchError && <p className="error-message">{rematchError}</p>}
-            </>
-          )}
+          {!opponentDisconnected &&
+            gameMode !== "remoteMultiplayer" &&
+            timeLeft !== null &&
+            timeLeft > 0 && (
+              <>
+                <button
+                  onClick={handleRematchClick}
+                  disabled={rematchRequested}
+                >
+                  {rematchRequested
+                    ? "Rematch Requested"
+                    : `Rematch (${timeLeft}s)`}
+                </button>
+                {rematchError && (
+                  <p className="error-message">{rematchError}</p>
+                )}
+              </>
+            )}
           <button onClick={handleLeaveGame}>Leave Game</button>
         </div>
       </div>
